@@ -11,7 +11,6 @@ import (
 type AuthUsecase interface {
 	Register(user *entities.User) error
 	Login(email, password string) (*entities.User, string, error)
-	ApproveTeacher(id string) error
 }
 
 type authUsecase struct {
@@ -32,16 +31,6 @@ func (u *authUsecase) Register(user *entities.User) error {
 		return err
 	}
 	user.Password = hashed
-
-	// aturan role
-	switch user.Role {
-	case "student":
-		user.IsActive = true
-	case "teacher":
-		user.IsActive = false // harus di-ACC admin
-	default:
-		return errors.New("invalid role")
-	}
 
 	return u.userRepo.Create(user)
 }
@@ -71,8 +60,4 @@ func (u *authUsecase) Login(email, password string) (*entities.User, string, err
 	}
 
 	return user, token, nil
-}
-
-func (u *authUsecase) ApproveTeacher(id string) error {
-	return u.userRepo.ApproveTeacher(id)
 }

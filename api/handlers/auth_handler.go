@@ -23,7 +23,6 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
-		Role     string `json:"role"`
 		FullName string `json:"full_name"`
 		School   string `json:"school"`
 		Domicile string `json:"domicile"`
@@ -43,7 +42,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		Username: req.Username,
 		Email:    req.Email,
 		Password: req.Password,
-		Role:     req.Role,
+		Role:     "student",
+		IsActive: true,
 		FullName: req.FullName,
 		School:   req.School,
 		Domicile: req.Domicile,
@@ -59,15 +59,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		)
 	}
 
-	message := "registration success"
-	if user.Role == "teacher" {
-		message = "registration success, waiting admin approval"
-	}
-
 	return utils.Success(
 		c,
 		fiber.StatusCreated,
-		message,
+		"registration success",
 		fiber.Map{
 			"id":    user.ID,
 			"email": user.Email,
@@ -113,6 +108,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		fiber.Map{
 			"id":    user.ID,
 			"email": user.Email,
+			"name": user.FullName,
 			"role":  user.Role,
 			"token": token,
 		},
@@ -120,35 +116,4 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	)
 }
 
-// ================= ADMIN APPROVE TEACHER =================
-// PUT /admin/approve/:id
-func (h *AuthHandler) ApproveTeacher(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if id == "" {
-		return utils.Error(
-			c,
-			fiber.StatusBadRequest,
-			"id is required",
-			"BAD_REQUEST",
-			nil,
-		)
-	}
 
-	if err := h.authUC.ApproveTeacher(id); err != nil {
-		return utils.Error(
-			c,
-			fiber.StatusBadRequest,
-			err.Error(),
-			"APPROVE_FAILED",
-			nil,
-		)
-	}
-
-	return utils.Success(
-		c,
-		fiber.StatusOK,
-		"teacher approved successfully",
-		nil,
-		nil,
-	)
-}
