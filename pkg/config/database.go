@@ -48,7 +48,7 @@ func ConnectDatabase() {
 		&entities.ClassMember{},
 		&entities.Card{},
 		&entities.CardState{},
-
+		&entities.TeacherRequest{},
 	)
 	if err != nil {
 		log.Fatal("❌ Failed to migrate:", err)

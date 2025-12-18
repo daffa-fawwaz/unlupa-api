@@ -11,7 +11,4 @@ func AuthRoutes(router fiber.Router, authHandler *handlers.AuthHandler) {
 
 	auth.Post("/register", authHandler.Register)
 	auth.Post("/login", authHandler.Login)
-
-	// admin only (nanti pasang middleware)
-	auth.Put("/admin/approve/:id", authHandler.ApproveTeacher)
 }

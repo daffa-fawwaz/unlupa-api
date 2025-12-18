@@ -17,29 +17,31 @@ import (
 )
 
 func main() {
-	// Load .env
 	godotenv.Load()
 
-	// Koneksi ke database
 	config.ConnectDatabase()
 
-	// Buat Fiber app
 	app := fiber.New()
 
-	// app.Use(cors.New(cors.Config{
-	// 	AllowOrigins:     "http://localhost:5173",
-	// 	AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-	// 	AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-	// 	ExposeHeaders:    "Content-Length",
-	// 	AllowCredentials: true,
-	// }))
-
+	// ================= REPOSITORY =================
 	userRepo := repositories.NewUserRepository(config.DB)
+	teacherReqRepo := repositories.NewTeacherRequestRepository(config.DB)
+
+	// ================= AUTH =================
 	authSvc := services.NewAuthService()
 	authUC := usecases.NewAuthUsecase(userRepo, authSvc)
 	authHandler := handlers.NewAuthHandler(authUC)
 
-	routes.SetupRoutes(app, authHandler)
+	// ================= USER (ADMIN) =================
+	userSvc := services.NewUserService(userRepo)
+	userHandler := handlers.NewUserHandler(userSvc)
+
+	// ================= TEACHER REQUEST =================
+	teacherReqSvc := services.NewTeacherRequestService(teacherReqRepo, userRepo)
+	teacherReqHandler := handlers.NewTeacherRequestHandler(teacherReqSvc)
+
+	// ================= ROUTES =================
+	routes.SetupRoutes(app, authHandler, userHandler, teacherReqHandler)
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {
@@ -47,5 +49,6 @@ func main() {
 	}
 
 	log.Printf("🚀 Server running on port %s...\n", port)
-	app.Listen(fmt.Sprintf(":%s", port))
+	log.Fatal(app.Listen(fmt.Sprintf(":%s", port)))
 }
+
