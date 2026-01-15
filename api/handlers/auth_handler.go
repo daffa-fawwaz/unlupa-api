@@ -20,12 +20,9 @@ func NewAuthHandler(authUC usecases.AuthUsecase) *AuthHandler {
 // POST /register
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req struct {
-		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
 		FullName string `json:"full_name"`
-		School   string `json:"school"`
-		Domicile string `json:"domicile"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -38,15 +35,25 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		)
 	}
 
+	if req.Email == "" || req.Password == "" || req.FullName == "" {
+		return utils.Error(
+			c,
+			fiber.StatusBadRequest,
+			"email, password, and full_name are required",
+			"VALIDATION_ERROR",
+			nil,
+		)
+	}
+
 	user := &entities.User{
-		Username: req.Username,
+
 		Email:    req.Email,
 		Password: req.Password,
+
+		FullName: req.FullName,
+
 		Role:     "student",
 		IsActive: true,
-		FullName: req.FullName,
-		School:   req.School,
-		Domicile: req.Domicile,
 	}
 
 	if err := h.authUC.Register(user); err != nil {
@@ -64,9 +71,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		fiber.StatusCreated,
 		"registration success",
 		fiber.Map{
-			"id":    user.ID,
-			"email": user.Email,
-			"role":  user.Role,
+			"id":        user.ID,
+			"email":     user.Email,
+			"full_name": user.FullName,
+			"role":      user.Role,
 		},
 		nil,
 	)
@@ -115,5 +123,4 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		nil,
 	)
 }
-
 

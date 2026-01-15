@@ -8,19 +8,28 @@ import (
 )
 
 type Card struct {
-	ID uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
 
-	KitabID uuid.UUID `gorm:"type:uuid;not null;index" json:"kitab_id"`
+	// Kepemilikan & konteks (FSRS TIDAK PEDULI)
+	OwnerID uuid.UUID `gorm:"type:uuid;index"`
+	ItemID  uuid.UUID `gorm:"type:uuid;not null;index"`
+	Source  string    `gorm:"size:32;index"`
+	RefID   string    `gorm:"size:64;index"`
 
-	OrderIndex int    `gorm:"not null" json:"order_index"`
-	ContentText string `gorm:"type:text" json:"content_text"`
+	// FSRS PURE STATE
+	Stability  float64 `gorm:"not null"`
+	Difficulty float64 `gorm:"not null"`
 
-	ContentAudioURL string `gorm:"size:255" json:"content_audio_url"`
-	ContentImageURL string `gorm:"size:255" json:"content_image_url"`
+	LastReviewAt time.Time `gorm:"not null"`
 
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+// ✅ GORM HOOK — FIXED
 func (c *Card) BeforeCreate(tx *gorm.DB) error {
-	c.ID = uuid.New()
+	if c.ID == uuid.Nil {
+		c.ID = uuid.New()
+	}
 	return nil
 }

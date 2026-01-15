@@ -11,6 +11,10 @@ func SetupRoutes(
 	authHandler *handlers.AuthHandler,
 	userHandler *handlers.UserHandler,
 	teacherReqHandler *handlers.TeacherRequestHandler,
+	loadControlHandler *handlers.LoadControlHandler,
+	cardHandler *handlers.CardHandler,
+	dailyTaskHandler *handlers.DailyTaskHandler,
+	dailyTaskActionHandler *handlers.DailyTaskActionHandler,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
@@ -18,4 +22,8 @@ func SetupRoutes(
 	AuthRoutes(v1, authHandler)
 	UserRoutes(v1, teacherReqHandler)
 	AdminRoutes(v1, userHandler, teacherReqHandler)
+	RegisterLoadControlRoutes(v1, loadControlHandler)
+	RegisterCardRoutes(v1, cardHandler)
+	RegisterDailyTaskRoutes(v1, dailyTaskHandler)
+	RegisterDailyTaskActionRoutes(v1, dailyTaskActionHandler)
 }
