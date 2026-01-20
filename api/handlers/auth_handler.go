@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
+
 	"hifzhun-api/pkg/entities"
+	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/usecases"
 	"hifzhun-api/pkg/utils"
 
@@ -39,28 +42,46 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return utils.Error(
 			c,
 			fiber.StatusBadRequest,
-			"email, password, and full_name are required",
+			"validation error",
 			"VALIDATION_ERROR",
-			nil,
+			[]utils.FieldError{
+				{Field: "email", Messages: []string{"email is required"}},
+				{Field: "password", Messages: []string{"password is required"}},
+				{Field: "full_name", Messages: []string{"full name is required"}},
+			},
 		)
 	}
 
 	user := &entities.User{
-
 		Email:    req.Email,
 		Password: req.Password,
-
 		FullName: req.FullName,
-
 		Role:     "student",
 		IsActive: true,
 	}
 
-	if err := h.authUC.Register(user); err != nil {
+	err := h.authUC.Register(user)
+	if err != nil {
+
+		if errors.Is(err, repositories.ErrEmailAlreadyExists) {
+			return utils.Error(
+				c,
+				fiber.StatusBadRequest,
+				"email already registered",
+				"EMAIL_ALREADY_EXISTS",
+				[]utils.FieldError{
+					{
+						Field:    "email",
+						Messages: []string{"email already exists"},
+					},
+				},
+			)
+		}
+
 		return utils.Error(
 			c,
-			fiber.StatusBadRequest,
-			err.Error(),
+			fiber.StatusInternalServerError,
+			"failed to register user",
 			"REGISTER_FAILED",
 			nil,
 		)
@@ -116,11 +137,10 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		fiber.Map{
 			"id":    user.ID,
 			"email": user.Email,
-			"name": user.FullName,
+			"name":  user.FullName,
 			"role":  user.Role,
 			"token": token,
 		},
 		nil,
 	)
 }
-

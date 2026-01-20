@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
+	"hifzhun-api/pkg/utils"
+
+	"github.com/google/uuid"
 )
 
 type DailyTaskService interface {
@@ -102,7 +103,7 @@ func (s *dailyTaskService) ListToday(
 	now time.Time,
 ) ([]entities.DailyTask, error) {
 
-	taskDate := now.Truncate(24 * time.Hour)
+	taskDate := utils.NormalizeDate(now)
 
 	return s.dailyTaskRepo.ListByUserAndDate(
 		ctx,

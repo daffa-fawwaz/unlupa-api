@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	"hifzhun-api/pkg/repositories"
+	"hifzhun-api/pkg/utils"
+
+	"github.com/google/uuid"
 )
 
 type DailyTaskActionService interface {
@@ -42,7 +43,7 @@ func (s *dailyTaskActionService) MarkDone(
 	now time.Time,
 ) error {
 
-	taskDate := now.Truncate(24 * time.Hour)
+	taskDate := utils.NormalizeDate(now)
 
 	return s.repo.UpdateState(
 		ctx,
@@ -60,7 +61,7 @@ func (s *dailyTaskActionService) MarkSkipped(
 	now time.Time,
 ) error {
 
-	taskDate := now.Truncate(24 * time.Hour)
+	taskDate := utils.NormalizeDate(now)
 
 	return s.repo.UpdateState(
 		ctx,
@@ -70,3 +71,4 @@ func (s *dailyTaskActionService) MarkSkipped(
 		"skipped",
 	)
 }
+

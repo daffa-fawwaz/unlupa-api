@@ -39,7 +39,7 @@ func (r *dailyTaskActionRepository) UpdateState(
 	res := r.db.WithContext(ctx).
 		Model(&entities.DailyTask{}).
 		Where("user_id = ?", userID).
-		Where("task_date = ?", taskDate).
+		Where("task_date = DATE(?)", taskDate). // ✅ KRITIS
 		Where("card_id = ?", cardID).
 		Where("state = ?", "pending").
 		Update("state", newState)
@@ -54,3 +54,4 @@ func (r *dailyTaskActionRepository) UpdateState(
 
 	return nil
 }
+
