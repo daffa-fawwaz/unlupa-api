@@ -17,7 +17,18 @@ func NewUserHandler(userSvc services.UserService) *UserHandler {
 
 // ================= ADMIN =================
 
-// GET /api/v1/admin/users?role=teacher
+// GetAllUsers godoc
+// @Summary Get all users (Admin)
+// @Description Get all users, optionally filtered by role
+// @Tags User Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param role query string false "Filter by role (student, teacher, admin)"
+// @Success 200 {object} utils.SuccessResponse{data=[]entities.User}
+// @Failure 403 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
+// @Router /admin/users [get]
 func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 	role := c.Query("role")
 
@@ -41,7 +52,18 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 	)
 }
 
-// POST /api/v1/admin/users/:id/activate
+// ActivateUser godoc
+// @Summary Activate user (Admin)
+// @Description Activate a user account
+// @Tags User Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/users/{id}/activate [post]
 func (h *UserHandler) ActivateUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -74,7 +96,18 @@ func (h *UserHandler) ActivateUser(c *fiber.Ctx) error {
 	)
 }
 
-// POST /api/v1/admin/users/:id/deactivate
+// DeactivateUser godoc
+// @Summary Deactivate user (Admin)
+// @Description Deactivate a user account
+// @Tags User Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/users/{id}/deactivate [post]
 func (h *UserHandler) DeactivateUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -106,5 +139,3 @@ func (h *UserHandler) DeactivateUser(c *fiber.Ctx) error {
 		nil,
 	)
 }
-
-

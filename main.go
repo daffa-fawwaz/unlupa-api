@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	fiberSwagger "github.com/swaggo/fiber-swagger"
 
 	"hifzhun-api/api/handlers"
 	"hifzhun-api/api/routes"
+	_ "hifzhun-api/docs" // swagger docs
 	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/seeders"
@@ -19,6 +22,25 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
+
+// @title Hifzhun API
+// @version 1.0
+// @description API untuk aplikasi hafalan Al-Quran dan Kitab
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.email support@hifzhun.com
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:3000
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
 	seedFlag := flag.Bool("seed", false, "Run database seeders")
@@ -51,6 +73,9 @@ func main() {
 	AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 	AllowCredentials: true,
 }))
+
+	// Swagger route
+	app.Get("/swagger/*", fiberSwagger.WrapHandler)
 
 	// ================= REPOSITORY =================
 	userRepo := repositories.NewUserRepository(config.DB)
@@ -88,10 +113,13 @@ func main() {
 	cardHandler := handlers.NewCardHandler(reviewSvc)
 
 	// ================= DAILY TASK =================
+	// Note: itemRepo is declared here first for daily task service
+	itemRepoForDaily := repositories.NewItemRepository(config.DB)
 	dailyTaskRepo := repositories.NewDailyTaskRepository(config.DB)
 	dailyTaskSvc := services.NewDailyTaskService(
 	reviewStateRepo,
 	dailyTaskRepo,
+	itemRepoForDaily,
 )
     dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc)
 
@@ -107,6 +135,45 @@ dailyTaskActionHandler := handlers.NewDailyTaskActionHandler(
 )
 
 
+// graduation engine
+graduationPreEngineRepo := repositories.NewItemGraduationRepository(config.DB)
+graduationPreEngineSvc := services.NewGraduationPreEngine(graduationPreEngineRepo)
+graduationPreEngineHandler := handlers.NewGraduationPreEngineHandler(graduationPreEngineSvc)
+
+
+// ================= HAFALAN (JUZ & JUZ ITEM) =================
+quranValidator, err := services.NewQuranValidator("quranjson/source/surah.json")
+if err != nil {
+	log.Fatalf("Failed to initialize QuranValidator: %v", err)
+}
+juzRepo := repositories.NewJuzRepository(config.DB)
+itemRepo := repositories.NewItemRepository(config.DB)
+juzItemRepo := repositories.NewJuzItemRepository(config.DB)
+hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
+juzHandler := handlers.NewJuzHandler(hafalanSvc)
+juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc)
+
+// ================= ITEM STATUS =================
+itemStatusSvc := services.NewItemStatusService(itemRepo)
+itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc)
+
+// ================= ITEM REVIEW =================
+itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo)
+itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc)
+
+// ================= BOOK =================
+bookRepo := repositories.NewBookRepository(config.DB)
+bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
+bookItemRepo := repositories.NewBookItemRepository(config.DB)
+bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo)
+bookHandler := handlers.NewBookHandler(bookSvc)
+
+// ================= CLASS =================
+classRepo := repositories.NewClassRepository(config.DB)
+classMemberRepo := repositories.NewClassMemberRepository(config.DB)
+classBookRepo := repositories.NewClassBookRepository(config.DB)
+classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo)
+classHandler := handlers.NewClassHandler(classSvc)
 
 	// ================= ROUTES =================
 routes.SetupRoutes(
@@ -117,7 +184,14 @@ routes.SetupRoutes(
 	loadControlHandler,
 	cardHandler,
 	dailyTaskHandler,
-	dailyTaskActionHandler, // 🔥 WAJIB
+	dailyTaskActionHandler,
+	graduationPreEngineHandler,
+	juzHandler,
+	juzItemHandler,
+	itemStatusHandler,
+	itemReviewHandler,
+	bookHandler,
+	classHandler,
 )
 
 

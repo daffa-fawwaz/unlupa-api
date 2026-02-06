@@ -15,15 +15,31 @@ func SetupRoutes(
 	cardHandler *handlers.CardHandler,
 	dailyTaskHandler *handlers.DailyTaskHandler,
 	dailyTaskActionHandler *handlers.DailyTaskActionHandler,
+	graduationPreEngineHandler *handlers.GraduationPreEngineHandler,
+	juzHandler *handlers.JuzHandler,
+	juzItemHandler *handlers.JuzItemHandler,
+	itemStatusHandler *handlers.ItemStatusHandler,
+	itemReviewHandler *handlers.ItemReviewHandler,
+	bookHandler *handlers.BookHandler,
+	classHandler *handlers.ClassHandler,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
 
 	AuthRoutes(v1, authHandler)
 	UserRoutes(v1, teacherReqHandler)
-	AdminRoutes(v1, userHandler, teacherReqHandler)
+	AdminRoutes(v1, userHandler, teacherReqHandler, bookHandler)
 	RegisterLoadControlRoutes(v1, loadControlHandler)
 	RegisterCardRoutes(v1, cardHandler)
 	RegisterDailyTaskRoutes(v1, dailyTaskHandler)
 	RegisterDailyTaskActionRoutes(v1, dailyTaskActionHandler)
+	RegisterGraduationPreEngineRoutes(v1, graduationPreEngineHandler)
+	RegisterJuzRoutes(v1, juzHandler, juzItemHandler)
+	RegisterItemStatusRoutes(v1, itemStatusHandler, itemReviewHandler)
+	RegisterBookRoutes(v1, bookHandler)
+	RegisterClassRoutes(v1, classHandler)
 }
+
+
+
+
