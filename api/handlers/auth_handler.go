@@ -19,8 +19,17 @@ func NewAuthHandler(authUC usecases.AuthUsecase) *AuthHandler {
 	return &AuthHandler{authUC}
 }
 
-// ================= REGISTER =================
-// POST /register
+// Register godoc
+// @Summary Register new user
+// @Description Register a new user account as student
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "Register request"
+// @Success 201 {object} utils.SuccessResponse{data=RegisterResponse}
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
@@ -101,8 +110,16 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	)
 }
 
-// ================= LOGIN =================
-// POST /login
+// Login godoc
+// @Summary Login user
+// @Description Authenticate user and return JWT token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login request"
+// @Success 200 {object} utils.SuccessResponse{data=LoginResponse}
+// @Failure 401 {object} utils.ErrorResponse
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
@@ -143,4 +160,36 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		},
 		nil,
 	)
+}
+
+// ==================== REQUEST/RESPONSE MODELS ====================
+
+// RegisterRequest represents register request body
+type RegisterRequest struct {
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"password123"`
+	FullName string `json:"full_name" example:"John Doe"`
+}
+
+// RegisterResponse represents register response data
+type RegisterResponse struct {
+	ID       string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Email    string `json:"email" example:"user@example.com"`
+	FullName string `json:"full_name" example:"John Doe"`
+	Role     string `json:"role" example:"student"`
+}
+
+// LoginRequest represents login request body
+type LoginRequest struct {
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"password123"`
+}
+
+// LoginResponse represents login response data
+type LoginResponse struct {
+	ID    string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Email string `json:"email" example:"user@example.com"`
+	Name  string `json:"name" example:"John Doe"`
+	Role  string `json:"role" example:"student"`
+	Token string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }

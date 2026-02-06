@@ -8,17 +8,23 @@ import (
 )
 
 type ItemGraduation struct {
-	ID     uuid.UUID `gorm:"type:uuid;primaryKey"`
-	ItemID uuid.UUID `gorm:"type:uuid;uniqueIndex"`
+	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
 
-	Reason string
-	// USER_DECISION | SYSTEM_RULE
+	UserID uuid.UUID `gorm:"type:uuid;not null;index"`
+	ItemID uuid.UUID `gorm:"type:uuid;not null;index"`
 
-	FrozenAt time.Time
-	ReactivatedAt *time.Time
+	// Keputusan akhir
+	Action string `gorm:"size:16;not null"` 
+	// graduate | freeze | reactivate
+
+	Reason string `gorm:"size:255"`
+
+	CreatedAt time.Time
 }
 
 func (ig *ItemGraduation) BeforeCreate(tx *gorm.DB) error {
-	ig.ID = uuid.New()
+	if ig.ID == uuid.Nil {
+		ig.ID = uuid.New()
+	}
 	return nil
 }

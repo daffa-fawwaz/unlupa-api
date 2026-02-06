@@ -1,0 +1,2385 @@
+basePath: /api/v1
+definitions:
+  entities.Book:
+    properties:
+      cover_image:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/entities.BookItem'
+        type: array
+      modules:
+        description: Relations
+        items:
+          $ref: '#/definitions/entities.BookModule'
+        type: array
+      owner_id:
+        type: string
+      published_at:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entities.BookItem:
+    properties:
+      book_id:
+        type: string
+      content:
+        description: materi konten
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      module_id:
+        description: null jika langsung di book
+        type: string
+      order:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entities.BookModule:
+    properties:
+      book_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      items:
+        description: Relations
+        items:
+          $ref: '#/definitions/entities.BookItem'
+        type: array
+      order:
+        type: integer
+      parent_id:
+        description: untuk nested module (opsional)
+        type: string
+      title:
+        type: string
+    type: object
+  entities.Class:
+    properties:
+      books:
+        items:
+          $ref: '#/definitions/entities.ClassBook'
+        type: array
+      class_code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      guru_id:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      members:
+        description: Relations
+        items:
+          $ref: '#/definitions/entities.ClassMember'
+        type: array
+      name:
+        type: string
+      type:
+        description: quran | book
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entities.ClassBook:
+    properties:
+      book:
+        allOf:
+        - $ref: '#/definitions/entities.Book'
+        description: Relations
+      book_id:
+        type: string
+      class_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      order:
+        type: integer
+    type: object
+  entities.ClassMember:
+    properties:
+      class_id:
+        type: string
+      id:
+        type: string
+      joined_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  entities.Item:
+    properties:
+      contentRef:
+        type: string
+      createdAt:
+        type: string
+      difficulty:
+        type: number
+      id:
+        type: string
+      intervalDays:
+        description: Custom interval days (for interval phase)
+        type: integer
+      intervalEndAt:
+        description: Deadline for interval
+        type: string
+      intervalStartAt:
+        description: When interval started
+        type: string
+      lastReviewAt:
+        type: string
+      nextReviewAt:
+        type: string
+      ownerID:
+        type: string
+      sourceType:
+        description: quran | class | personal
+        type: string
+      stability:
+        description: FSRS Fields (for fsrs_active phase)
+        type: number
+      status:
+        description: Status State Machine
+        type: string
+    type: object
+  entities.Juz:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      index:
+        description: 1 - 30
+        type: integer
+      userID:
+        type: string
+    type: object
+  entities.TeacherRequest:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      message:
+        type: string
+      status:
+        description: pending, approved, rejected
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/entities.User'
+      user_id:
+        type: string
+    type: object
+  entities.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        description: ===== PROFILE =====
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_payment_ref:
+        type: string
+      plan:
+        description: ===== SAAS READY =====
+        type: string
+      plan_expired_at:
+        type: string
+      role:
+        type: string
+      subscription_status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  fiber.Error:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
+  handlers.AddBookItemRequest:
+    properties:
+      content:
+        example: Penjelasan hukum nun mati...
+        type: string
+      order:
+        example: 1
+        type: integer
+      title:
+        example: Hukum Nun Mati
+        type: string
+    type: object
+  handlers.AddBookRequest:
+    properties:
+      book_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      order:
+        example: 1
+        type: integer
+    type: object
+  handlers.AddModuleItemRequest:
+    properties:
+      book_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      content:
+        example: Konten item...
+        type: string
+      order:
+        example: 1
+        type: integer
+      title:
+        example: Sub Item
+        type: string
+    type: object
+  handlers.AddModuleRequest:
+    properties:
+      description:
+        example: Pengenalan tajwid
+        type: string
+      order:
+        example: 1
+        type: integer
+      parent_id:
+        example: ""
+        type: string
+      title:
+        example: 'Bab 1: Pengenalan'
+        type: string
+    type: object
+  handlers.CreateBookRequest:
+    properties:
+      cover_image:
+        example: https://example.com/cover.jpg
+        type: string
+      description:
+        example: Panduan belajar tajwid
+        type: string
+      title:
+        example: Belajar Tajwid
+        type: string
+    type: object
+  handlers.CreateClassRequest:
+    properties:
+      description:
+        example: Belajar tajwid dari dasar
+        type: string
+      name:
+        example: Kelas Tajwid A
+        type: string
+      type:
+        enum:
+        - quran
+        - book
+        example: book
+        type: string
+    type: object
+  handlers.CreateHafalanRequest:
+    properties:
+      content_ref:
+        description: surah:78:1-5 | page:582
+        example: surah:78:1-5
+        type: string
+      mode:
+        description: surah | page
+        example: surah
+        type: string
+    type: object
+  handlers.DailyTaskResponse:
+    properties:
+      card_id:
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+      item_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      source:
+        example: quran
+        type: string
+      state:
+        example: pending
+        type: string
+      task_date:
+        description: YYYY-MM-DD
+        example: "2026-02-06"
+        type: string
+    type: object
+  handlers.GraduationDecisionRequest:
+    properties:
+      action:
+        description: graduate | freeze | reactivate
+        enum:
+        - graduate
+        - freeze
+        - reactivate
+        example: graduate
+        type: string
+      item_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      reason:
+        example: Student has mastered this item
+        type: string
+    type: object
+  handlers.JoinClassRequest:
+    properties:
+      code:
+        example: AB3K7X
+        type: string
+    type: object
+  handlers.LoadControlResponse:
+    properties:
+      card_id:
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+      item_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      next_review_at:
+        type: string
+      stability:
+        example: 2.5
+        type: number
+      state:
+        example: learning
+        type: string
+    type: object
+  handlers.LoginRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: password123
+        type: string
+    type: object
+  handlers.LoginResponse:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: John Doe
+        type: string
+      role:
+        example: student
+        type: string
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    type: object
+  handlers.RegisterRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      full_name:
+        example: John Doe
+        type: string
+      password:
+        example: password123
+        type: string
+    type: object
+  handlers.RegisterResponse:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      full_name:
+        example: John Doe
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      role:
+        example: student
+        type: string
+    type: object
+  handlers.ReviewCardRequest:
+    description: Review card request with rating
+    properties:
+      rating:
+        description: 1=Again, 2=Hard, 3=Good, 4=Easy
+        example: 3
+        maximum: 4
+        minimum: 1
+        type: integer
+    type: object
+  handlers.ReviewCardResponse:
+    description: Response after reviewing a card
+    properties:
+      card_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      difficulty:
+        example: 3.2
+        type: number
+      last_review_at:
+        type: string
+      next_interval_days:
+        example: 7
+        type: integer
+      next_review_at:
+        type: string
+      stability:
+        example: 5.5
+        type: number
+    type: object
+  handlers.ReviewItemRequest:
+    properties:
+      rating:
+        description: 1=Again, 2=Hard, 3=Good, 4=Easy
+        example: 3
+        maximum: 4
+        minimum: 1
+        type: integer
+    type: object
+  handlers.ReviewItemResponse:
+    properties:
+      difficulty:
+        example: 3.2
+        type: number
+      graduated:
+        example: false
+        type: boolean
+      item_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      next_interval_days:
+        example: 7
+        type: integer
+      next_review_at:
+        type: string
+      stability:
+        example: 5.5
+        type: number
+      status:
+        example: fsrs_active
+        type: string
+    type: object
+  handlers.StartIntervalRequest:
+    properties:
+      interval_days:
+        example: 7
+        type: integer
+    type: object
+  handlers.TeacherReqBody:
+    properties:
+      message:
+        example: Saya ingin menjadi guru di platform ini
+        type: string
+    type: object
+  handlers.UpdateBookItemRequest:
+    properties:
+      content:
+        example: Updated content...
+        type: string
+      order:
+        example: 2
+        type: integer
+      title:
+        example: Updated Title
+        type: string
+    type: object
+  handlers.UpdateBookRequest:
+    properties:
+      cover_image:
+        example: https://example.com/cover2.jpg
+        type: string
+      description:
+        example: Panduan lengkap
+        type: string
+      title:
+        example: Belajar Tajwid Lengkap
+        type: string
+    type: object
+  handlers.UpdateClassRequest:
+    properties:
+      description:
+        example: Updated description
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      name:
+        example: Kelas Tajwid B
+        type: string
+    type: object
+  handlers.UpdateModuleRequest:
+    properties:
+      description:
+        example: Updated desc
+        type: string
+      order:
+        example: 1
+        type: integer
+      title:
+        example: 'Bab 1: Intro'
+        type: string
+    type: object
+  services.MemberInfo:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      joined_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  services.StudentProgress:
+    properties:
+      email:
+        type: string
+      fsrs_active:
+        type: integer
+      full_name:
+        type: string
+      graduate:
+        type: integer
+      interval:
+        type: integer
+      menghafal:
+        type: integer
+      progress_pct:
+        type: number
+      total_items:
+        type: integer
+      user_id:
+        type: string
+    type: object
+  utils.ErrorResponse:
+    properties:
+      error:
+        type: string
+      errors:
+        items:
+          $ref: '#/definitions/utils.FieldError'
+        type: array
+      message:
+        type: string
+      path:
+        type: string
+      statusCode:
+        type: integer
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  utils.FieldError:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+      messages:
+        items:
+          type: string
+        type: array
+    type: object
+  utils.Meta:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  utils.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/utils.Meta'
+      path:
+        type: string
+      status:
+        type: integer
+      timestamp:
+        type: string
+    type: object
+host: localhost:3000
+info:
+  contact:
+    email: support@hifzhun.com
+    name: API Support
+  description: API untuk aplikasi hafalan Al-Quran dan Kitab
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Hifzhun API
+  version: "1.0"
+paths:
+  /admin/books/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve a pending book for publishing
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve book (Admin)
+      tags:
+      - Book Admin
+  /admin/books/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject a pending book
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject book (Admin)
+      tags:
+      - Book Admin
+  /admin/books/pending:
+    get:
+      consumes:
+      - application/json
+      description: Get all books pending for approval
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Book'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get pending books (Admin)
+      tags:
+      - Book Admin
+  /admin/teacher-requests:
+    get:
+      consumes:
+      - application/json
+      description: Get all pending teacher requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.TeacherRequest'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get pending teacher requests (Admin)
+      tags:
+      - Teacher Request Admin
+  /admin/teacher-requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve a pending teacher request
+      parameters:
+      - description: Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve teacher request (Admin)
+      tags:
+      - Teacher Request Admin
+  /admin/teacher-requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject a pending teacher request
+      parameters:
+      - description: Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject teacher request (Admin)
+      tags:
+      - Teacher Request Admin
+  /admin/users:
+    get:
+      consumes:
+      - application/json
+      description: Get all users, optionally filtered by role
+      parameters:
+      - description: Filter by role (student, teacher, admin)
+        in: query
+        name: role
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.User'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all users (Admin)
+      tags:
+      - User Admin
+  /admin/users/{id}/activate:
+    post:
+      consumes:
+      - application/json
+      description: Activate a user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Activate user (Admin)
+      tags:
+      - User Admin
+  /admin/users/{id}/deactivate:
+    post:
+      consumes:
+      - application/json
+      description: Deactivate a user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Deactivate user (Admin)
+      tags:
+      - User Admin
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.LoginResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Login user
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account as student
+      parameters:
+      - description: Register request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.RegisterResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Register new user
+      tags:
+      - Auth
+  /books:
+    get:
+      consumes:
+      - application/json
+      description: Get all books owned by the user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Book'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my books
+      tags:
+      - Book
+    post:
+      consumes:
+      - application/json
+      description: Create a new book (draft status)
+      parameters:
+      - description: Create book request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateBookRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Book'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new book
+      tags:
+      - Book
+  /books/{book_id}/items:
+    post:
+      consumes:
+      - application/json
+      description: Add a new item directly to a book
+      parameters:
+      - description: Book ID
+        in: path
+        name: book_id
+        required: true
+        type: string
+      - description: Add item request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AddBookItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.BookItem'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add item to book
+      tags:
+      - Book Item
+  /books/{book_id}/modules:
+    post:
+      consumes:
+      - application/json
+      description: Add a new module to a book
+      parameters:
+      - description: Book ID
+        in: path
+        name: book_id
+        required: true
+        type: string
+      - description: Add module request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AddModuleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.BookModule'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add module to book
+      tags:
+      - Book Module
+  /books/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a book and all its modules/items
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete book
+      tags:
+      - Book
+    get:
+      consumes:
+      - application/json
+      description: Get book detail with modules and items
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Book'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get book detail
+      tags:
+      - Book
+    put:
+      consumes:
+      - application/json
+      description: Update book title, description, or cover image
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update book request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateBookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Book'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update book
+      tags:
+      - Book
+  /books/{id}/request-publish:
+    post:
+      consumes:
+      - application/json
+      description: Submit book for admin approval
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request book publish
+      tags:
+      - Book
+  /books/items/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a book item
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete book item
+      tags:
+      - Book Item
+    put:
+      consumes:
+      - application/json
+      description: Update a book item
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update item request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateBookItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.BookItem'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update book item
+      tags:
+      - Book Item
+  /books/modules/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a book module
+      parameters:
+      - description: Module ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete module
+      tags:
+      - Book Module
+    put:
+      consumes:
+      - application/json
+      description: Update a book module
+      parameters:
+      - description: Module ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update module request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateModuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.BookModule'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update module
+      tags:
+      - Book Module
+  /books/modules/{module_id}/items:
+    post:
+      consumes:
+      - application/json
+      description: Add a new item to a book module
+      parameters:
+      - description: Module ID
+        in: path
+        name: module_id
+        required: true
+        type: string
+      - description: Add item request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AddModuleItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.BookItem'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add item to module
+      tags:
+      - Book Item
+  /books/published:
+    get:
+      consumes:
+      - application/json
+      description: Get all published/approved books
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Book'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Get published books
+      tags:
+      - Book
+  /cards/{id}/review:
+    post:
+      consumes:
+      - application/json
+      description: Submit a review rating for a flashcard (FSRS algorithm)
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Review rating (1=Again, 2=Hard, 3=Good, 4=Easy)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ReviewCardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ReviewCardResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: Review a card
+      tags:
+      - Card
+  /classes:
+    get:
+      consumes:
+      - application/json
+      description: Get all classes owned by the teacher
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Class'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get teacher's classes
+      tags:
+      - Class
+    post:
+      consumes:
+      - application/json
+      description: Teacher creates a new class (quran or book type)
+      parameters:
+      - description: Create class request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateClassRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Class'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new class
+      tags:
+      - Class
+  /classes/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a class and all its members/books
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete class
+      tags:
+      - Class
+    get:
+      consumes:
+      - application/json
+      description: Get class detail with members and books
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Class'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get class detail
+      tags:
+      - Class
+    put:
+      consumes:
+      - application/json
+      description: Update class name, description, or active status
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update class request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateClassRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Class'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update class
+      tags:
+      - Class
+  /classes/{id}/books:
+    get:
+      consumes:
+      - application/json
+      description: Get all books in a book-type class
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.ClassBook'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get class books
+      tags:
+      - Class
+    post:
+      consumes:
+      - application/json
+      description: Add a book to book-type class (teacher only)
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Add book request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AddBookRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.ClassBook'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add book to class
+      tags:
+      - Class
+  /classes/{id}/books/{book_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a book from class (teacher only)
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Book ID
+        in: path
+        name: book_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove book from class
+      tags:
+      - Class
+  /classes/{id}/leave:
+    delete:
+      consumes:
+      - application/json
+      description: Student leaves a class
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Leave class
+      tags:
+      - Class
+  /classes/{id}/members:
+    get:
+      consumes:
+      - application/json
+      description: Get all members of a class (teacher only)
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/services.MemberInfo'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get class members
+      tags:
+      - Class
+  /classes/{id}/progress:
+    get:
+      consumes:
+      - application/json
+      description: Get progress of all students in quran-type class
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/services.StudentProgress'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get student progress
+      tags:
+      - Class
+  /classes/join:
+    post:
+      consumes:
+      - application/json
+      description: Student joins a class using class code
+      parameters:
+      - description: Join class request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.JoinClassRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Class'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Join class with code
+      tags:
+      - Class
+  /classes/joined:
+    get:
+      consumes:
+      - application/json
+      description: Get all classes the student has joined
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Class'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get joined classes
+      tags:
+      - Class
+  /daily-tasks/{card_id}/done:
+    post:
+      consumes:
+      - application/json
+      description: Mark a daily task as completed
+      parameters:
+      - description: Card ID
+        in: path
+        name: card_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: Mark task as done
+      tags:
+      - Daily Task
+  /daily-tasks/{card_id}/skip:
+    post:
+      consumes:
+      - application/json
+      description: Mark a daily task as skipped
+      parameters:
+      - description: Card ID
+        in: path
+        name: card_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: Mark task as skipped
+      tags:
+      - Daily Task
+  /daily-tasks/generate:
+    post:
+      consumes:
+      - application/json
+      description: Generate daily tasks for today
+      parameters:
+      - default: 0
+        description: Limit number of tasks
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/fiber.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: Generate today's tasks
+      tags:
+      - Daily Task
+  /daily-tasks/today:
+    get:
+      consumes:
+      - application/json
+      description: Get all daily tasks for today
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.DailyTaskResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/fiber.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: List today's tasks
+      tags:
+      - Daily Task
+  /graduation/decide:
+    post:
+      consumes:
+      - application/json
+      description: Decide to graduate, freeze, or reactivate an item
+      parameters:
+      - description: Graduation decision
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.GraduationDecisionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: Make graduation decision
+      tags:
+      - Graduation
+  /items:
+    get:
+      consumes:
+      - application/json
+      description: Get all items filtered by status
+      parameters:
+      - description: Status (menghafal, interval, fsrs_active, graduate)
+        in: query
+        name: status
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Item'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get items by status
+      tags:
+      - Item Status
+  /items/{item_id}/review:
+    post:
+      consumes:
+      - application/json
+      description: Submit a review rating for a hafalan item
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      - description: Review rating
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ReviewItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.ReviewItemResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Review an item
+      tags:
+      - Item Review
+  /items/{item_id}/start-interval:
+    post:
+      consumes:
+      - application/json
+      description: Move item from menghafal to interval phase
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      - description: Interval days
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.StartIntervalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Item'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Start interval phase for item
+      tags:
+      - Item Status
+  /items/deadlines:
+    get:
+      consumes:
+      - application/json
+      description: Get items that have reached their interval deadline
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.Item'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get items with deadline reached
+      tags:
+      - Item Status
+  /juz/{index}:
+    post:
+      consumes:
+      - application/json
+      description: Create a new juz entry for Quran memorization
+      parameters:
+      - description: Juz index (1-30)
+        in: path
+        name: index
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Juz'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create juz for hafalan
+      tags:
+      - Juz
+  /juz/{juz_id}/items:
+    post:
+      consumes:
+      - application/json
+      description: Add a new hafalan item (surah verses or page) to a juz
+      parameters:
+      - description: Juz ID
+        in: path
+        name: juz_id
+        required: true
+        type: string
+      - description: Hafalan request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateHafalanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add hafalan item to juz
+      tags:
+      - Juz Item
+  /load/today:
+    get:
+      consumes:
+      - application/json
+      description: Get items selected for today's review session
+      parameters:
+      - default: 10
+        description: Limit number of items
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.LoadControlResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/fiber.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Error'
+      security:
+      - BearerAuth: []
+      summary: Get today's load
+      tags:
+      - Load Control
+  /teacher-request:
+    post:
+      consumes:
+      - application/json
+      description: Submit a request to become a teacher
+      parameters:
+      - description: Teacher request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TeacherReqBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request to become teacher
+      tags:
+      - Teacher Request
+  /teacher-request/my:
+    get:
+      consumes:
+      - application/json
+      description: Get the current user's teacher request status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.TeacherRequest'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my teacher request
+      tags:
+      - Teacher Request
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

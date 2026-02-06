@@ -16,7 +16,17 @@ func NewTeacherRequestHandler(teacherReqSvc services.TeacherRequestService) *Tea
 	return &TeacherRequestHandler{teacherReqSvc}
 }
 
-// POST /api/v1/teacher-request
+// RequestTeacher godoc
+// @Summary Request to become teacher
+// @Description Submit a request to become a teacher
+// @Tags Teacher Request
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body TeacherReqBody true "Teacher request body"
+// @Success 201 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /teacher-request [post]
 func (h *TeacherRequestHandler) RequestTeacher(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 
@@ -53,7 +63,16 @@ func (h *TeacherRequestHandler) RequestTeacher(c *fiber.Ctx) error {
 	)
 }
 
-// GET /api/v1/teacher-request/my
+// GetMyRequest godoc
+// @Summary Get my teacher request
+// @Description Get the current user's teacher request status
+// @Tags Teacher Request
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} utils.SuccessResponse{data=entities.TeacherRequest}
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /teacher-request/my [get]
 func (h *TeacherRequestHandler) GetMyRequest(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 
@@ -79,7 +98,17 @@ func (h *TeacherRequestHandler) GetMyRequest(c *fiber.Ctx) error {
 
 // ================= ADMIN =================
 
-// GET /api/v1/admin/teacher-requests
+// GetPendingRequests godoc
+// @Summary Get pending teacher requests (Admin)
+// @Description Get all pending teacher requests
+// @Tags Teacher Request Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} utils.SuccessResponse{data=[]entities.TeacherRequest}
+// @Failure 403 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
+// @Router /admin/teacher-requests [get]
 func (h *TeacherRequestHandler) GetPendingRequests(c *fiber.Ctx) error {
 	requests, err := h.teacherReqSvc.GetPendingRequests()
 	if err != nil {
@@ -101,7 +130,18 @@ func (h *TeacherRequestHandler) GetPendingRequests(c *fiber.Ctx) error {
 	)
 }
 
-// POST /api/v1/admin/teacher-requests/:id/approve
+// ApproveRequest godoc
+// @Summary Approve teacher request (Admin)
+// @Description Approve a pending teacher request
+// @Tags Teacher Request Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Request ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/teacher-requests/{id}/approve [post]
 func (h *TeacherRequestHandler) ApproveRequest(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -134,7 +174,18 @@ func (h *TeacherRequestHandler) ApproveRequest(c *fiber.Ctx) error {
 	)
 }
 
-// POST /api/v1/admin/teacher-requests/:id/reject
+// RejectRequest godoc
+// @Summary Reject teacher request (Admin)
+// @Description Reject a pending teacher request
+// @Tags Teacher Request Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Request ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/teacher-requests/{id}/reject [post]
 func (h *TeacherRequestHandler) RejectRequest(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -165,4 +216,11 @@ func (h *TeacherRequestHandler) RejectRequest(c *fiber.Ctx) error {
 		nil,
 		nil,
 	)
+}
+
+// ==================== REQUEST MODELS ====================
+
+// TeacherReqBody represents teacher request body
+type TeacherReqBody struct {
+	Message string `json:"message" example:"Saya ingin menjadi guru di platform ini"`
 }

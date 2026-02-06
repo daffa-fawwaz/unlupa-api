@@ -11,6 +11,7 @@ func AdminRoutes(
 	router fiber.Router,
 	userHandler *handlers.UserHandler,
 	teacherReqHandler *handlers.TeacherRequestHandler,
+	bookHandler *handlers.BookHandler,
 ) {
 	admin := router.Group(
 		"/admin",
@@ -25,4 +26,10 @@ func AdminRoutes(
 	admin.Get("/users", userHandler.GetAllUsers)
 	admin.Post("/users/:id/activate", userHandler.ActivateUser)
 	admin.Post("/users/:id/deactivate", userHandler.DeactivateUser)
+
+	// Book approval endpoints
+	admin.Get("/books/pending", bookHandler.GetPendingBooks)
+	admin.Post("/books/:id/approve", bookHandler.ApproveBook)
+	admin.Post("/books/:id/reject", bookHandler.RejectBook)
 }
+

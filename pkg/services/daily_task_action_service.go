@@ -24,6 +24,13 @@ type DailyTaskActionService interface {
 		cardID uuid.UUID,
 		now time.Time,
 	) error
+
+	MarkDoneByItemID(
+		ctx context.Context,
+		userID uuid.UUID,
+		itemID uuid.UUID,
+		now time.Time,
+	) error
 }
 
 type dailyTaskActionService struct {
@@ -71,4 +78,24 @@ func (s *dailyTaskActionService) MarkSkipped(
 		"skipped",
 	)
 }
+
+// MarkDoneByItemID marks daily task as done by itemID (for interval items without cardID)
+func (s *dailyTaskActionService) MarkDoneByItemID(
+	ctx context.Context,
+	userID uuid.UUID,
+	itemID uuid.UUID,
+	now time.Time,
+) error {
+
+	taskDate := utils.NormalizeDate(now)
+
+	return s.repo.UpdateStateByItemID(
+		ctx,
+		userID,
+		taskDate,
+		itemID,
+		"done",
+	)
+}
+
 

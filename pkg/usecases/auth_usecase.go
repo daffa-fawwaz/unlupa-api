@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"errors"
-	"fmt"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
@@ -45,12 +44,7 @@ func (u *authUsecase) Login(email, password string) (*entities.User, string, err
 		return nil, "", errors.New("account not active, waiting admin approval")
 	}
 
-	// DEBUG: hapus setelah fix
-	fmt.Printf("DEBUG - Hash from DB: %s\n", user.Password)
-	fmt.Printf("DEBUG - Password input: %s\n", password)
-
 	if err := u.authSvc.CheckPassword(user.Password, password); err != nil {
-		fmt.Printf("DEBUG - bcrypt error: %v\n", err)
 		return nil, "", errors.New("wrong password")
 	}
 
@@ -61,3 +55,4 @@ func (u *authUsecase) Login(email, password string) (*entities.User, string, err
 
 	return user, token, nil
 }
+

@@ -10,12 +10,13 @@ import (
 	"hifzhun-api/pkg/services"
 )
 
+// DailyTaskResponse represents daily task response
 type DailyTaskResponse struct {
-	ItemID   uuid.UUID `json:"item_id"`
-	CardID   uuid.UUID `json:"card_id"`
-	Source   string    `json:"source"`
-	State    string    `json:"state"`
-	TaskDate string    `json:"task_date"` // YYYY-MM-DD
+	ItemID   uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CardID   uuid.UUID `json:"card_id" example:"550e8400-e29b-41d4-a716-446655440001"`
+	Source   string    `json:"source" example:"quran"`
+	State    string    `json:"state" example:"pending"`
+	TaskDate string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
 }
 
 type DailyTaskHandler struct {
@@ -26,7 +27,18 @@ func NewDailyTaskHandler(service services.DailyTaskService) *DailyTaskHandler {
 	return &DailyTaskHandler{service: service}
 }
 
-// POST /daily-tasks/generate?limit=10
+// GenerateToday godoc
+// @Summary Generate today's tasks
+// @Description Generate daily tasks for today
+// @Tags Daily Task
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param limit query int false "Limit number of tasks" default(0)
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} fiber.Error
+// @Failure 500 {object} fiber.Error
+// @Router /daily-tasks/generate [post]
 func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 	userID, ok := c.Locals("user_id").(uuid.UUID)
 	if !ok {
@@ -51,7 +63,17 @@ func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 	})
 }
 
-// GET /daily-tasks/today
+// ListToday godoc
+// @Summary List today's tasks
+// @Description Get all daily tasks for today
+// @Tags Daily Task
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} DailyTaskResponse
+// @Failure 401 {object} fiber.Error
+// @Failure 500 {object} fiber.Error
+// @Router /daily-tasks/today [get]
 func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	userID, ok := c.Locals("user_id").(uuid.UUID)
 	if !ok {

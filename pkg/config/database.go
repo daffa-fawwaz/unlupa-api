@@ -60,6 +60,12 @@ func ConnectDatabase() {
 		&entities.EngineControl{},
 		&entities.FSRSWeights{},
 		&entities.Card{},
+		&entities.Juz{},
+		&entities.JuzItem{},
+		&entities.Book{},
+		&entities.BookModule{},
+		&entities.BookItem{},
+		&entities.ClassBook{},
 
 	)
 	if err != nil {

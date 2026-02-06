@@ -18,6 +18,14 @@ type DailyTaskActionRepository interface {
 		cardID uuid.UUID,
 		newState string,
 	) error
+
+	UpdateStateByItemID(
+		ctx context.Context,
+		userID uuid.UUID,
+		taskDate time.Time,
+		itemID uuid.UUID,
+		newState string,
+	) error
 }
 
 type dailyTaskActionRepository struct {
@@ -54,4 +62,33 @@ func (r *dailyTaskActionRepository) UpdateState(
 
 	return nil
 }
+
+// UpdateStateByItemID for interval items that don't have cardID
+func (r *dailyTaskActionRepository) UpdateStateByItemID(
+	ctx context.Context,
+	userID uuid.UUID,
+	taskDate time.Time,
+	itemID uuid.UUID,
+	newState string,
+) error {
+
+	res := r.db.WithContext(ctx).
+		Model(&entities.DailyTask{}).
+		Where("user_id = ?", userID).
+		Where("task_date = DATE(?)", taskDate).
+		Where("item_id = ?", itemID).
+		Where("state = ?", "pending").
+		Update("state", newState)
+
+	if res.Error != nil {
+		return res.Error
+	}
+
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
 
