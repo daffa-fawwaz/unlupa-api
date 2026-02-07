@@ -19,24 +19,51 @@ type ItemReviewResult struct {
 	IntervalDays    int
 	NextReviewAt    *time.Time
 	Graduated       bool
+	PendingGraduate bool // true if waiting for teacher approval
 }
 
 type ItemReviewService struct {
 	itemRepo            *repositories.ItemRepository
 	fsrsWeightsRepo     repositories.FSRSWeightsRepository
 	dailyTaskActionRepo repositories.DailyTaskActionRepository
+	classMemberRepo     repositories.ClassMemberRepository
+	classRepo           repositories.ClassRepository
 }
 
 func NewItemReviewService(
 	itemRepo *repositories.ItemRepository,
 	fsrsWeightsRepo repositories.FSRSWeightsRepository,
 	dailyTaskActionRepo repositories.DailyTaskActionRepository,
+	classMemberRepo repositories.ClassMemberRepository,
+	classRepo repositories.ClassRepository,
 ) *ItemReviewService {
 	return &ItemReviewService{
 		itemRepo:            itemRepo,
 		fsrsWeightsRepo:     fsrsWeightsRepo,
 		dailyTaskActionRepo: dailyTaskActionRepo,
+		classMemberRepo:     classMemberRepo,
+		classRepo:           classRepo,
 	}
+}
+
+// isUserInQuranClass checks if user has joined any active Quran class
+func (s *ItemReviewService) isUserInQuranClass(userID uuid.UUID) bool {
+	classes, err := s.classMemberRepo.FindByUserID(userID.String())
+	if err != nil || len(classes) == 0 {
+		return false
+	}
+
+	// Check if any of the classes is a Quran-type class
+	for _, membership := range classes {
+		class, err := s.classRepo.FindByID(membership.ClassID.String())
+		if err != nil {
+			continue
+		}
+		if class.Type == entities.ClassTypeQuran && class.IsActive {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ItemReviewService) ReviewItem(
@@ -113,9 +140,16 @@ func (s *ItemReviewService) ReviewItem(
 
 	// 12. Check for graduation (interval >= 30 days) - only for fsrs_active
 	graduated := false
+	pendingGraduate := false
 	if item.Status == entities.ItemStatusFSRSActive && intervalDays >= entities.GraduationIntervalDays {
-		item.Status = entities.ItemStatusGraduate
-		graduated = true
+		// Check if user is in a Quran class - if yes, require teacher approval
+		if item.SourceType == "quran" && s.isUserInQuranClass(userID) {
+			item.Status = entities.ItemStatusPendingGraduate
+			pendingGraduate = true
+		} else {
+			item.Status = entities.ItemStatusGraduate
+			graduated = true
+		}
 	}
 
 	// 13. Save item
@@ -134,11 +168,10 @@ func (s *ItemReviewService) ReviewItem(
 	)
 
 	return &ItemReviewResult{
-		Item:         item,
-		IntervalDays: intervalDays,
-		NextReviewAt: &nextReview,
-		Graduated:    graduated,
+		Item:            item,
+		IntervalDays:    intervalDays,
+		NextReviewAt:    &nextReview,
+		Graduated:       graduated,
+		PendingGraduate: pendingGraduate,
 	}, nil
 }
-
-

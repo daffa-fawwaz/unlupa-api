@@ -11,6 +11,7 @@ type ClassMemberRepository interface {
 	FindByClassID(classID string) ([]entities.ClassMember, error)
 	FindByUserID(userID string) ([]entities.ClassMember, error)
 	FindByClassAndUser(classID, userID string) (*entities.ClassMember, error)
+	IsMember(classID, userID string) (bool, error)
 	Delete(id string) error
 	DeleteByClassAndUser(classID, userID string) error
 	DeleteByClassID(classID string) error
@@ -51,6 +52,14 @@ func (r *classMemberRepository) FindByClassAndUser(classID, userID string) (*ent
 		Where("class_id = ? AND user_id = ?", classID, userID).
 		First(&member).Error
 	return &member, err
+}
+
+func (r *classMemberRepository) IsMember(classID, userID string) (bool, error) {
+	var count int64
+	err := r.db.Model(&entities.ClassMember{}).
+		Where("class_id = ? AND user_id = ?", classID, userID).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func (r *classMemberRepository) Delete(id string) error {

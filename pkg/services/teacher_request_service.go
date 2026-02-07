@@ -14,6 +14,7 @@ type TeacherRequestService interface {
 	GetPendingRequests() ([]entities.TeacherRequest, error)
 	ApproveRequest(id string) error
 	RejectRequest(id string) error
+	GetStats() (*repositories.TeacherRequestStats, error)
 }
 
 type teacherRequestService struct {
@@ -95,3 +96,8 @@ func (s *teacherRequestService) RejectRequest(id string) error {
 
 	return s.teacherReqRepo.UpdateStatus(id, "rejected")
 }
+
+func (s *teacherRequestService) GetStats() (*repositories.TeacherRequestStats, error) {
+	return s.teacherReqRepo.GetStats()
+}
+

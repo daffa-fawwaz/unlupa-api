@@ -157,10 +157,6 @@ juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc)
 itemStatusSvc := services.NewItemStatusService(itemRepo)
 itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc)
 
-// ================= ITEM REVIEW =================
-itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo)
-itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc)
-
 // ================= BOOK =================
 bookRepo := repositories.NewBookRepository(config.DB)
 bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
@@ -174,6 +170,10 @@ classMemberRepo := repositories.NewClassMemberRepository(config.DB)
 classBookRepo := repositories.NewClassBookRepository(config.DB)
 classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo)
 classHandler := handlers.NewClassHandler(classSvc)
+
+// ================= ITEM REVIEW =================
+itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo)
+itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc)
 
 	// ================= ROUTES =================
 routes.SetupRoutes(

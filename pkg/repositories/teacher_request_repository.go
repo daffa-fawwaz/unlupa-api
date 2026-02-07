@@ -8,12 +8,19 @@ import (
 	"gorm.io/gorm"
 )
 
+type TeacherRequestStats struct {
+	Pending  int64 `json:"pending"`
+	Approved int64 `json:"approved"`
+	Rejected int64 `json:"rejected"`
+}
+
 type TeacherRequestRepository interface {
 	Create(req *entities.TeacherRequest) error
 	FindByID(id string) (*entities.TeacherRequest, error)
 	FindByUserID(userID uuid.UUID) (*entities.TeacherRequest, error)
 	GetPendingRequests() ([]entities.TeacherRequest, error)
 	UpdateStatus(id string, status string) error
+	GetStats() (*TeacherRequestStats, error)
 }
 
 type teacherRequestRepository struct {
@@ -59,3 +66,19 @@ func (r *teacherRequestRepository) GetPendingRequests() ([]entities.TeacherReque
 func (r *teacherRequestRepository) UpdateStatus(id string, status string) error {
 	return r.db.Model(&entities.TeacherRequest{}).Where("id = ?", id).Update("status", status).Error
 }
+
+func (r *teacherRequestRepository) GetStats() (*TeacherRequestStats, error) {
+	var stats TeacherRequestStats
+
+	// Count pending
+	r.db.Model(&entities.TeacherRequest{}).Where("status = ?", "pending").Count(&stats.Pending)
+	
+	// Count approved
+	r.db.Model(&entities.TeacherRequest{}).Where("status = ?", "approved").Count(&stats.Approved)
+	
+	// Count rejected
+	r.db.Model(&entities.TeacherRequest{}).Where("status = ?", "rejected").Count(&stats.Rejected)
+
+	return &stats, nil
+}
+
