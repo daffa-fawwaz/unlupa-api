@@ -60,10 +60,11 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 func (s *ItemStatusService) GetItemsByStatus(userID uuid.UUID, status string) ([]entities.Item, error) {
 	// Validate status
 	validStatuses := map[string]bool{
-		entities.ItemStatusMenghafal:  true,
-		entities.ItemStatusInterval:   true,
-		entities.ItemStatusFSRSActive: true,
-		entities.ItemStatusGraduate:   true,
+		entities.ItemStatusMenghafal:       true,
+		entities.ItemStatusInterval:        true,
+		entities.ItemStatusFSRSActive:      true,
+		entities.ItemStatusPendingGraduate: true,
+		entities.ItemStatusGraduate:        true,
 	}
 
 	if !validStatuses[status] {

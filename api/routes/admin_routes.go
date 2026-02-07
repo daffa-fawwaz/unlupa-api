@@ -20,6 +20,7 @@ func AdminRoutes(
 	)
 
 	admin.Get("/teacher-requests", teacherReqHandler.GetPendingRequests)
+	admin.Get("/teacher-requests/stats", teacherReqHandler.GetStats)
 	admin.Post("/teacher-requests/:id/approve", teacherReqHandler.ApproveRequest)
 	admin.Post("/teacher-requests/:id/reject", teacherReqHandler.RejectRequest)
 

@@ -385,3 +385,79 @@ type AddBookRequest struct {
 type JoinClassRequest struct {
 	Code string `json:"code" example:"AB3K7X"`
 }
+
+// ==================== GRADUATION APPROVAL ENDPOINTS ====================
+
+// GetPendingGraduations godoc
+// @Summary Get pending graduations
+// @Description Teacher gets all items pending graduation approval in a class
+// @Tags Class
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Class ID"
+// @Success 200 {object} utils.SuccessResponse{data=[]services.PendingGraduation}
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /classes/{id}/graduations/pending [get]
+func (h *ClassHandler) GetPendingGraduations(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	classID := c.Params("id")
+
+	pending, err := h.classSvc.GetPendingGraduations(classID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "GET_PENDING_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "pending graduations fetched successfully", pending, nil)
+}
+
+// ApproveGraduation godoc
+// @Summary Approve graduation
+// @Description Teacher approves an item for graduation
+// @Tags Class
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Class ID"
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /classes/{id}/graduations/{item_id}/approve [post]
+func (h *ClassHandler) ApproveGraduation(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	classID := c.Params("id")
+	itemID := c.Params("item_id")
+
+	if err := h.classSvc.ApproveGraduation(classID, userID, itemID); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "APPROVE_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "graduation approved successfully", nil, nil)
+}
+
+// RejectGraduation godoc
+// @Summary Reject graduation
+// @Description Teacher rejects an item for graduation (returns to fsrs_active)
+// @Tags Class
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Class ID"
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /classes/{id}/graduations/{item_id}/reject [post]
+func (h *ClassHandler) RejectGraduation(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	classID := c.Params("id")
+	itemID := c.Params("item_id")
+
+	if err := h.classSvc.RejectGraduation(classID, userID, itemID); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REJECT_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "graduation rejected, item returned to fsrs_active", nil, nil)
+}

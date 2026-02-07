@@ -135,6 +135,12 @@ definitions:
     type: object
   entities.Item:
     properties:
+      approvedAt:
+        description: When graduation was approved
+        type: string
+      approvedBy:
+        description: Teacher Approval Fields (for pending_graduate phase)
+        type: string
       contentRef:
         type: string
       createdAt:
@@ -556,36 +562,154 @@ definitions:
         example: 'Bab 1: Intro'
         type: string
     type: object
+  repositories.TeacherRequestStats:
+    properties:
+      approved:
+        type: integer
+      pending:
+        type: integer
+      rejected:
+        type: integer
+    type: object
+  services.ItemDetail:
+    description: Detail of a single hafalan item including its current phase/status
+    properties:
+      content_ref:
+        description: Content reference (e.g., "surah:78:1-10" or "page:582")
+        example: surah:78:1-10
+        type: string
+      created_at:
+        description: When the item was created
+        type: string
+      interval_days:
+        description: Interval days (only for interval phase)
+        example: 7
+        type: integer
+      interval_end_at:
+        description: When interval will end (only for interval phase)
+        type: string
+      item_id:
+        description: UUID of the item
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      next_review_at:
+        description: Next review date (only for fsrs_active phase)
+        type: string
+      stability:
+        description: FSRS stability score (only for fsrs_active phase)
+        example: 5.5
+        type: number
+      status:
+        description: 'Current status/phase: menghafal, interval, fsrs_active, graduate'
+        example: interval
+        type: string
+    type: object
   services.MemberInfo:
+    description: Basic information about a student who joined the class
     properties:
       email:
+        description: Member's email address
+        example: student@example.com
         type: string
       full_name:
+        description: Member's full name
+        example: Ahmad Abdullah
         type: string
       joined_at:
+        description: Date and time when the member joined the class
+        example: "2026-02-01T10:30:00Z"
         type: string
       user_id:
+        description: UUID of the member
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  services.PendingGraduation:
+    description: Item pending teacher approval for graduation
+    properties:
+      content_ref:
+        description: Content reference (e.g., "surah:78:1-10" or "page:582")
+        example: surah:78:1-10
+        type: string
+      created_at:
+        description: When the item was created
+        type: string
+      item_id:
+        description: UUID of the item
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      last_interval_days:
+        description: Last interval days before pending
+        example: 32
+        type: integer
+      stability:
+        description: FSRS stability score
+        example: 35.5
+        type: number
+      student_email:
+        description: Student's email
+        example: student@example.com
+        type: string
+      student_id:
+        description: Student who owns this item
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+      student_name:
+        description: Student's full name
+        example: Ahmad Abdullah
         type: string
     type: object
   services.StudentProgress:
+    description: Progress data for a student in a Quran-type class, showing hafalan
+      statistics and item details
     properties:
       email:
+        description: Student's email address
+        example: student@example.com
         type: string
       fsrs_active:
+        description: Number of items in 'fsrs_active' status (actively being reviewed
+          with FSRS algorithm)
+        example: 12
         type: integer
       full_name:
+        description: Student's full name
+        example: Ahmad Abdullah
         type: string
       graduate:
+        description: Number of items in 'graduate' status (mastered/completed memorization)
+        example: 5
         type: integer
       interval:
+        description: Number of items in 'interval' status (waiting for interval period
+          to complete)
+        example: 8
         type: integer
+      items:
+        description: Detailed list of all hafalan items with their current status
+        items:
+          $ref: '#/definitions/services.ItemDetail'
+        type: array
       menghafal:
+        description: Number of items in 'menghafal' status (currently memorizing)
+        example: 5
+        type: integer
+      pending_graduate:
+        description: Number of items in 'pending_graduate' status (waiting for teacher
+          approval)
+        example: 2
         type: integer
       progress_pct:
+        description: Overall progress percentage (graduate / total_items * 100)
+        example: 16.67
         type: number
       total_items:
+        description: Total number of hafalan items the student has
+        example: 30
         type: integer
       user_id:
+        description: UUID of the student
+        example: 550e8400-e29b-41d4-a716-446655440000
         type: string
     type: object
   utils.ErrorResponse:
@@ -840,6 +964,32 @@ paths:
       security:
       - BearerAuth: []
       summary: Reject teacher request (Admin)
+      tags:
+      - Teacher Request Admin
+  /admin/teacher-requests/stats:
+    get:
+      consumes:
+      - application/json
+      description: Admin gets count of pending, approved, and rejected teacher requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/repositories.TeacherRequestStats'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get teacher request statistics
       tags:
       - Teacher Request Admin
   /admin/users:
@@ -1774,6 +1924,116 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove book from class
+      tags:
+      - Class
+  /classes/{id}/graduations/{item_id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Teacher approves an item for graduation
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve graduation
+      tags:
+      - Class
+  /classes/{id}/graduations/{item_id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Teacher rejects an item for graduation (returns to fsrs_active)
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject graduation
+      tags:
+      - Class
+  /classes/{id}/graduations/pending:
+    get:
+      consumes:
+      - application/json
+      description: Teacher gets all items pending graduation approval in a class
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/services.PendingGraduation'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get pending graduations
       tags:
       - Class
   /classes/{id}/leave:

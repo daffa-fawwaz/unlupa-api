@@ -231,6 +231,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/teacher-requests/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin gets count of pending, approved, and rejected teacher requests",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Teacher Request Admin"
+                ],
+                "summary": "Get teacher request statistics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/repositories.TeacherRequestStats"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/teacher-requests/{id}/approve": {
             "post": {
                 "security": [
@@ -1983,6 +2029,182 @@ const docTemplate = `{
                 }
             }
         },
+        "/classes/{id}/graduations/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Teacher gets all items pending graduation approval in a class",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Class"
+                ],
+                "summary": "Get pending graduations",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Class ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/services.PendingGraduation"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/classes/{id}/graduations/{item_id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Teacher approves an item for graduation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Class"
+                ],
+                "summary": "Approve graduation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Class ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/classes/{id}/graduations/{item_id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Teacher rejects an item for graduation (returns to fsrs_active)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Class"
+                ],
+                "summary": "Reject graduation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Class ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/classes/{id}/leave": {
             "delete": {
                 "security": [
@@ -3076,6 +3298,14 @@ const docTemplate = `{
         "entities.Item": {
             "type": "object",
             "properties": {
+                "approvedAt": {
+                    "description": "When graduation was approved",
+                    "type": "string"
+                },
+                "approvedBy": {
+                    "description": "Teacher Approval Fields (for pending_graduate phase)",
+                    "type": "string"
+                },
                 "contentRef": {
                     "type": "string"
                 },
@@ -3673,52 +3903,194 @@ const docTemplate = `{
                 }
             }
         },
+        "repositories.TeacherRequestStats": {
+            "type": "object",
+            "properties": {
+                "approved": {
+                    "type": "integer"
+                },
+                "pending": {
+                    "type": "integer"
+                },
+                "rejected": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.ItemDetail": {
+            "description": "Detail of a single hafalan item including its current phase/status",
+            "type": "object",
+            "properties": {
+                "content_ref": {
+                    "description": "Content reference (e.g., \"surah:78:1-10\" or \"page:582\")",
+                    "type": "string",
+                    "example": "surah:78:1-10"
+                },
+                "created_at": {
+                    "description": "When the item was created",
+                    "type": "string"
+                },
+                "interval_days": {
+                    "description": "Interval days (only for interval phase)",
+                    "type": "integer",
+                    "example": 7
+                },
+                "interval_end_at": {
+                    "description": "When interval will end (only for interval phase)",
+                    "type": "string"
+                },
+                "item_id": {
+                    "description": "UUID of the item",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "next_review_at": {
+                    "description": "Next review date (only for fsrs_active phase)",
+                    "type": "string"
+                },
+                "stability": {
+                    "description": "FSRS stability score (only for fsrs_active phase)",
+                    "type": "number",
+                    "example": 5.5
+                },
+                "status": {
+                    "description": "Current status/phase: menghafal, interval, fsrs_active, graduate",
+                    "type": "string",
+                    "example": "interval"
+                }
+            }
+        },
         "services.MemberInfo": {
+            "description": "Basic information about a student who joined the class",
             "type": "object",
             "properties": {
                 "email": {
-                    "type": "string"
+                    "description": "Member's email address",
+                    "type": "string",
+                    "example": "student@example.com"
                 },
                 "full_name": {
-                    "type": "string"
+                    "description": "Member's full name",
+                    "type": "string",
+                    "example": "Ahmad Abdullah"
                 },
                 "joined_at": {
-                    "type": "string"
+                    "description": "Date and time when the member joined the class",
+                    "type": "string",
+                    "example": "2026-02-01T10:30:00Z"
                 },
                 "user_id": {
+                    "description": "UUID of the member",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "services.PendingGraduation": {
+            "description": "Item pending teacher approval for graduation",
+            "type": "object",
+            "properties": {
+                "content_ref": {
+                    "description": "Content reference (e.g., \"surah:78:1-10\" or \"page:582\")",
+                    "type": "string",
+                    "example": "surah:78:1-10"
+                },
+                "created_at": {
+                    "description": "When the item was created",
                     "type": "string"
+                },
+                "item_id": {
+                    "description": "UUID of the item",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "last_interval_days": {
+                    "description": "Last interval days before pending",
+                    "type": "integer",
+                    "example": 32
+                },
+                "stability": {
+                    "description": "FSRS stability score",
+                    "type": "number",
+                    "example": 35.5
+                },
+                "student_email": {
+                    "description": "Student's email",
+                    "type": "string",
+                    "example": "student@example.com"
+                },
+                "student_id": {
+                    "description": "Student who owns this item",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                },
+                "student_name": {
+                    "description": "Student's full name",
+                    "type": "string",
+                    "example": "Ahmad Abdullah"
                 }
             }
         },
         "services.StudentProgress": {
+            "description": "Progress data for a student in a Quran-type class, showing hafalan statistics and item details",
             "type": "object",
             "properties": {
                 "email": {
-                    "type": "string"
+                    "description": "Student's email address",
+                    "type": "string",
+                    "example": "student@example.com"
                 },
                 "fsrs_active": {
-                    "type": "integer"
+                    "description": "Number of items in 'fsrs_active' status (actively being reviewed with FSRS algorithm)",
+                    "type": "integer",
+                    "example": 12
                 },
                 "full_name": {
-                    "type": "string"
+                    "description": "Student's full name",
+                    "type": "string",
+                    "example": "Ahmad Abdullah"
                 },
                 "graduate": {
-                    "type": "integer"
+                    "description": "Number of items in 'graduate' status (mastered/completed memorization)",
+                    "type": "integer",
+                    "example": 5
                 },
                 "interval": {
-                    "type": "integer"
+                    "description": "Number of items in 'interval' status (waiting for interval period to complete)",
+                    "type": "integer",
+                    "example": 8
+                },
+                "items": {
+                    "description": "Detailed list of all hafalan items with their current status",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ItemDetail"
+                    }
                 },
                 "menghafal": {
-                    "type": "integer"
+                    "description": "Number of items in 'menghafal' status (currently memorizing)",
+                    "type": "integer",
+                    "example": 5
+                },
+                "pending_graduate": {
+                    "description": "Number of items in 'pending_graduate' status (waiting for teacher approval)",
+                    "type": "integer",
+                    "example": 2
                 },
                 "progress_pct": {
-                    "type": "number"
+                    "description": "Overall progress percentage (graduate / total_items * 100)",
+                    "type": "number",
+                    "example": 16.67
                 },
                 "total_items": {
-                    "type": "integer"
+                    "description": "Total number of hafalan items the student has",
+                    "type": "integer",
+                    "example": 30
                 },
                 "user_id": {
-                    "type": "string"
+                    "description": "UUID of the student",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
                 }
             }
         },

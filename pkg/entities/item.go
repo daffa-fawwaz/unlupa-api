@@ -9,10 +9,11 @@ import (
 
 // Item status constants
 const (
-	ItemStatusMenghafal  = "menghafal"
-	ItemStatusInterval   = "interval"
-	ItemStatusFSRSActive = "fsrs_active"
-	ItemStatusGraduate   = "graduate"
+	ItemStatusMenghafal       = "menghafal"
+	ItemStatusInterval        = "interval"
+	ItemStatusFSRSActive      = "fsrs_active"
+	ItemStatusPendingGraduate = "pending_graduate"
+	ItemStatusGraduate        = "graduate"
 )
 
 // Graduation threshold in days
@@ -25,7 +26,7 @@ type Item struct {
 	ContentRef string    `gorm:"not null"`
 
 	// Status State Machine
-	Status          string     `gorm:"type:varchar(20);not null;default:'menghafal'"` // menghafal | interval | fsrs_active | graduate
+	Status          string     `gorm:"type:varchar(20);not null;default:'menghafal'"` // menghafal | interval | fsrs_active | pending_graduate | graduate
 	IntervalDays    int        `gorm:"default:0"`                                      // Custom interval days (for interval phase)
 	IntervalStartAt *time.Time `gorm:"type:timestamp"`                                 // When interval started
 	IntervalEndAt   *time.Time `gorm:"type:timestamp"`                                 // Deadline for interval
@@ -35,6 +36,10 @@ type Item struct {
 	Difficulty   float64    `gorm:"default:5.0"`
 	LastReviewAt *time.Time `gorm:"type:timestamp"`
 	NextReviewAt *time.Time `gorm:"type:timestamp"`
+
+	// Teacher Approval Fields (for pending_graduate phase)
+	ApprovedBy *uuid.UUID `gorm:"type:uuid;index"` // Teacher who approved graduation
+	ApprovedAt *time.Time `gorm:"type:timestamp"`  // When graduation was approved
 
 	CreatedAt time.Time
 }

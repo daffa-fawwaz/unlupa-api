@@ -40,6 +40,11 @@ func RegisterClassRoutes(
 	teacher.Get("/:id/members", classHandler.GetClassMembers)
 	teacher.Get("/:id/progress", classHandler.GetStudentProgress)
 
+	// Graduation approval (Teacher only - Quran classes)
+	teacher.Get("/:id/graduations/pending", classHandler.GetPendingGraduations)
+	teacher.Post("/:id/graduations/:item_id/approve", classHandler.ApproveGraduation)
+	teacher.Post("/:id/graduations/:item_id/reject", classHandler.RejectGraduation)
+
 	// ==================== SHARED ENDPOINTS ====================
 	// These can be accessed by members of the class (student/teacher)
 	classes.Get("/:id", classHandler.GetClassDetail)

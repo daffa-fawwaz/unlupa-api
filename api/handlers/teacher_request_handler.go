@@ -218,6 +218,37 @@ func (h *TeacherRequestHandler) RejectRequest(c *fiber.Ctx) error {
 	)
 }
 
+// GetStats godoc
+// @Summary Get teacher request statistics
+// @Description Admin gets count of pending, approved, and rejected teacher requests
+// @Tags Teacher Request Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} utils.SuccessResponse{data=repositories.TeacherRequestStats}
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/teacher-requests/stats [get]
+func (h *TeacherRequestHandler) GetStats(c *fiber.Ctx) error {
+	stats, err := h.teacherReqSvc.GetStats()
+	if err != nil {
+		return utils.Error(
+			c,
+			fiber.StatusInternalServerError,
+			err.Error(),
+			"GET_STATS_FAILED",
+			nil,
+		)
+	}
+
+	return utils.Success(
+		c,
+		fiber.StatusOK,
+		"teacher request stats fetched successfully",
+		stats,
+		nil,
+	)
+}
+
 // ==================== REQUEST MODELS ====================
 
 // TeacherReqBody represents teacher request body
