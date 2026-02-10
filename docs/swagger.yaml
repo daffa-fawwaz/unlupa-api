@@ -164,6 +164,9 @@ definitions:
         type: string
       ownerID:
         type: string
+      reviewCount:
+        description: Total number of reviews
+        type: integer
       sourceType:
         description: quran | class | personal
         type: string
@@ -495,6 +498,9 @@ definitions:
         type: integer
       next_review_at:
         type: string
+      review_count:
+        example: 5
+        type: integer
       stability:
         example: 5.5
         type: number
@@ -657,6 +663,19 @@ definitions:
       student_name:
         description: Student's full name
         example: Ahmad Abdullah
+        type: string
+    type: object
+  services.StartMemorizationResult:
+    properties:
+      book_item_id:
+        type: string
+      book_title:
+        type: string
+      item_id:
+        type: string
+      item_title:
+        type: string
+      status:
         type: string
     type: object
   services.StudentProgress:
@@ -1386,6 +1405,44 @@ paths:
       security:
       - BearerAuth: []
       summary: Update book
+      tags:
+      - Book
+  /books/{id}/items/{item_id}/start:
+    post:
+      consumes:
+      - application/json
+      description: User starts memorizing a specific item from a book (published or
+        owned)
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Book Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.StartMemorizationResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Start memorizing a book item
       tags:
       - Book
   /books/{id}/request-publish:
@@ -2378,6 +2435,72 @@ paths:
       security:
       - BearerAuth: []
       summary: Get items by status
+      tags:
+      - Item Status
+  /items/{item_id}/deactivate:
+    post:
+      consumes:
+      - application/json
+      description: Move book item from fsrs_active to inactive status. Only for non-quran
+        items.
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Item'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Deactivate a book item
+      tags:
+      - Item Status
+  /items/{item_id}/reactivate:
+    post:
+      consumes:
+      - application/json
+      description: Move book item from inactive back to fsrs_active status. Only for
+        non-quran items.
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Item'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reactivate a book item
       tags:
       - Item Status
   /items/{item_id}/review:

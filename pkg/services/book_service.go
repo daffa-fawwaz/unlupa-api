@@ -34,23 +34,38 @@ type BookService interface {
 	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content string, order int) (*entities.BookItem, error)
 	UpdateItem(itemID string, ownerID uuid.UUID, title, content string, order int) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
+
+	// Memorization
+	StartItemMemorization(userID uuid.UUID, bookID, bookItemID string) (*StartMemorizationResult, error)
+}
+
+// StartMemorizationResult represents the result of starting book item memorization
+type StartMemorizationResult struct {
+	ItemID      uuid.UUID `json:"item_id"`
+	BookItemID  uuid.UUID `json:"book_item_id"`
+	BookTitle   string    `json:"book_title"`
+	ItemTitle   string    `json:"item_title"`
+	Status      string    `json:"status"`
 }
 
 type bookService struct {
 	bookRepo       repositories.BookRepository
 	bookModuleRepo repositories.BookModuleRepository
 	bookItemRepo   repositories.BookItemRepository
+	itemRepo       *repositories.ItemRepository
 }
 
 func NewBookService(
 	bookRepo repositories.BookRepository,
 	bookModuleRepo repositories.BookModuleRepository,
 	bookItemRepo repositories.BookItemRepository,
+	itemRepo *repositories.ItemRepository,
 ) BookService {
 	return &bookService{
 		bookRepo:       bookRepo,
 		bookModuleRepo: bookModuleRepo,
 		bookItemRepo:   bookItemRepo,
+		itemRepo:       itemRepo,
 	}
 }
 
@@ -409,3 +424,56 @@ func (s *bookService) DeleteItem(itemID string, ownerID uuid.UUID) error {
 
 	return s.bookItemRepo.Delete(itemID)
 }
+
+// ==================== MEMORIZATION ====================
+
+func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID string) (*StartMemorizationResult, error) {
+	// 1. Get book and validate access
+	book, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	// Check if book is accessible (published or owned by user)
+	if book.Status != entities.BookStatusPublished && book.OwnerID != userID {
+		return nil, errors.New("you don't have access to this book")
+	}
+
+	// 2. Get book item and validate it belongs to book
+	bookItem, err := s.bookItemRepo.FindByID(bookItemID)
+	if err != nil {
+		return nil, errors.New("book item not found")
+	}
+
+	if bookItem.BookID.String() != bookID {
+		return nil, errors.New("book item does not belong to this book")
+	}
+
+	// 3. Check if user already started this item (prevent duplicates)
+	contentRef := "book:" + bookID + ":item:" + bookItemID
+	existingItems, err := s.itemRepo.FindByOwnerAndContentRef(userID, contentRef)
+	if err == nil && len(existingItems) > 0 {
+		return nil, errors.New("you have already started memorizing this item")
+	}
+
+	// 4. Create new Item with status menghafal
+	item := &entities.Item{
+		OwnerID:    userID,
+		SourceType: "book", // book items use "book" as source type
+		ContentRef: contentRef,
+		Status:     entities.ItemStatusMenghafal,
+	}
+
+	if err := s.itemRepo.Create(item); err != nil {
+		return nil, err
+	}
+
+	return &StartMemorizationResult{
+		ItemID:     item.ID,
+		BookItemID: bookItem.ID,
+		BookTitle:  book.Title,
+		ItemTitle:  bookItem.Title,
+		Status:     item.Status,
+	}, nil
+}
+

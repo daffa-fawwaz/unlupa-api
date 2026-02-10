@@ -16,25 +16,29 @@ func RegisterBookRoutes(
 		middlewares.JWTAuth(),
 	)
 
-	// Book CRUD
+	// Book CRUD - specific paths first
 	books.Post("/", bookHandler.CreateBook)
 	books.Get("/", bookHandler.GetMyBooks)
 	books.Get("/published", bookHandler.GetPublishedBooks)
+
+	// Module static paths (before dynamic /:id)
+	books.Put("/modules/:id", bookHandler.UpdateModule)
+	books.Delete("/modules/:id", bookHandler.DeleteModule)
+	books.Post("/modules/:module_id/items", bookHandler.AddItemToModule)
+
+	// Item static paths (before dynamic /:id)
+	books.Put("/items/:id", bookHandler.UpdateItem)
+	books.Delete("/items/:id", bookHandler.DeleteItem)
+
+	// Dynamic book routes
 	books.Get("/:id", bookHandler.GetBookDetail)
 	books.Put("/:id", bookHandler.UpdateBook)
 	books.Delete("/:id", bookHandler.DeleteBook)
-
-	// Publish workflow
 	books.Post("/:id/request-publish", bookHandler.RequestPublish)
+	books.Post("/:id/modules", bookHandler.AddModule)
+	books.Post("/:id/items", bookHandler.AddItemToBook)
 
-	// Module CRUD
-	books.Post("/:book_id/modules", bookHandler.AddModule)
-	books.Put("/modules/:id", bookHandler.UpdateModule)
-	books.Delete("/modules/:id", bookHandler.DeleteModule)
-
-	// Item CRUD
-	books.Post("/:book_id/items", bookHandler.AddItemToBook)
-	books.Post("/modules/:module_id/items", bookHandler.AddItemToModule)
-	books.Put("/items/:id", bookHandler.UpdateItem)
-	books.Delete("/items/:id", bookHandler.DeleteItem)
+	// Memorization - start memorizing a specific book item
+	books.Post("/:id/items/:item_id/start", bookHandler.StartMemorization)
 }
+

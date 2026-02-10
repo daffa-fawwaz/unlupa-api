@@ -39,15 +39,24 @@ func (s *HafalanService) CreateJuz(userID uuid.UUID, index int) (*entities.Juz, 
 	return juz, err
 }
 
+// CreateHafalanResult represents the result of creating a hafalan item
+type CreateHafalanResult struct {
+	ItemID     uuid.UUID `json:"item_id"`
+	JuzID      uuid.UUID `json:"juz_id"`
+	SourceType string    `json:"source_type"`
+	ContentRef string    `json:"content_ref"`
+	Status     string    `json:"status"`
+}
+
 func (s *HafalanService) AddItemToJuz(
 	userID uuid.UUID,
 	juzID uuid.UUID,
 	mode string,       // surah | page
 	contentRef string, // surah:78:1-5 | page:582
-) error {
+) (*CreateHafalanResult, error) {
 	// Validate content_ref against Quran data
 	if err := s.quranValidator.ValidateContentRef(mode, contentRef); err != nil {
-		return err
+		return nil, err
 	}
 
 	item := &entities.Item{
@@ -57,7 +66,7 @@ func (s *HafalanService) AddItemToJuz(
 	}
 
 	if err := s.itemRepo.Create(item); err != nil {
-		return err
+		return nil, err
 	}
 
 	rel := &entities.JuzItem{
@@ -66,7 +75,17 @@ func (s *HafalanService) AddItemToJuz(
 		ItemID: item.ID,
 	}
 
-	return s.juzItemRepo.Create(rel)
+	if err := s.juzItemRepo.Create(rel); err != nil {
+		return nil, err
+	}
+
+	return &CreateHafalanResult{
+		ItemID:     item.ID,
+		JuzID:      juzID,
+		SourceType: item.SourceType,
+		ContentRef: item.ContentRef,
+		Status:     item.Status,
+	}, nil
 }
 
 

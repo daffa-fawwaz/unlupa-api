@@ -65,6 +65,7 @@ func (s *ItemStatusService) GetItemsByStatus(userID uuid.UUID, status string) ([
 		entities.ItemStatusFSRSActive:      true,
 		entities.ItemStatusPendingGraduate: true,
 		entities.ItemStatusGraduate:        true,
+		entities.ItemStatusInactive:        true,
 	}
 
 	if !validStatuses[status] {
@@ -112,3 +113,70 @@ func (s *ItemStatusService) GetDeadlineItems(userID uuid.UUID) ([]entities.Item,
 
 	return userItems, nil
 }
+
+// DeactivateItem moves book item from fsrs_active → inactive
+// Only for non-quran items (book items)
+func (s *ItemStatusService) DeactivateItem(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+
+	// Validate ownership
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	// Validate source type - only for book items
+	if item.SourceType == "quran" {
+		return nil, errors.New("quran items cannot be deactivated")
+	}
+
+	// Validate current status - must be fsrs_active
+	if item.Status != entities.ItemStatusFSRSActive {
+		return nil, errors.New("item must be in 'fsrs_active' status to deactivate")
+	}
+
+	// Transition to inactive
+	item.Status = entities.ItemStatusInactive
+
+	if err := s.itemRepo.Update(item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+
+// ReactivateItem moves book item from inactive → fsrs_active
+// Only for non-quran items (book items)
+func (s *ItemStatusService) ReactivateItem(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+
+	// Validate ownership
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	// Validate source type - only for book items
+	if item.SourceType == "quran" {
+		return nil, errors.New("quran items cannot be reactivated")
+	}
+
+	// Validate current status - must be inactive
+	if item.Status != entities.ItemStatusInactive {
+		return nil, errors.New("item must be in 'inactive' status to reactivate")
+	}
+
+	// Transition back to fsrs_active
+	item.Status = entities.ItemStatusFSRSActive
+
+	if err := s.itemRepo.Update(item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+

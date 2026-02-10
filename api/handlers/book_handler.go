@@ -539,3 +539,31 @@ type UpdateBookItemRequest struct {
 	Content string `json:"content" example:"Updated content..."`
 	Order   int    `json:"order" example:"2"`
 }
+
+// ==================== MEMORIZATION ====================
+
+// StartMemorization godoc
+// @Summary Start memorizing a book item
+// @Description User starts memorizing a specific item from a book (published or owned)
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Param item_id path string true "Book Item ID"
+// @Success 200 {object} utils.SuccessResponse{data=services.StartMemorizationResult}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /books/{id}/items/{item_id}/start [post]
+func (h *BookHandler) StartMemorization(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	bookID := c.Params("id")
+	bookItemID := c.Params("item_id")
+
+	result, err := h.bookSvc.StartItemMemorization(userID, bookID, bookItemID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "START_MEMORIZATION_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Item memorization started", result, nil)
+}
+

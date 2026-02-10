@@ -14,10 +14,14 @@ const (
 	ItemStatusFSRSActive      = "fsrs_active"
 	ItemStatusPendingGraduate = "pending_graduate"
 	ItemStatusGraduate        = "graduate"
+	ItemStatusInactive        = "inactive" // For book items only - user can deactivate/reactivate
 )
 
 // Graduation threshold in days
 const GraduationIntervalDays = 30
+
+// Graduate review interval in days (review every 20 days after graduation)
+const GraduateReviewDays = 20
 
 type Item struct {
 	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -34,6 +38,7 @@ type Item struct {
 	// FSRS Fields (for fsrs_active phase)
 	Stability    float64    `gorm:"default:0"`
 	Difficulty   float64    `gorm:"default:5.0"`
+	ReviewCount  int        `gorm:"default:0"`   // Total number of reviews
 	LastReviewAt *time.Time `gorm:"type:timestamp"`
 	NextReviewAt *time.Time `gorm:"type:timestamp"`
 

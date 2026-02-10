@@ -142,7 +142,7 @@ graduationPreEngineHandler := handlers.NewGraduationPreEngineHandler(graduationP
 
 
 // ================= HAFALAN (JUZ & JUZ ITEM) =================
-quranValidator, err := services.NewQuranValidator("quranjson/source/surah.json")
+quranValidator, err := services.NewQuranValidator("data/surah.json")
 if err != nil {
 	log.Fatalf("Failed to initialize QuranValidator: %v", err)
 }
@@ -161,7 +161,7 @@ itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc)
 bookRepo := repositories.NewBookRepository(config.DB)
 bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
 bookItemRepo := repositories.NewBookItemRepository(config.DB)
-bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo)
+bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo)
 bookHandler := handlers.NewBookHandler(bookSvc)
 
 // ================= CLASS =================

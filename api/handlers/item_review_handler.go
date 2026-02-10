@@ -33,6 +33,7 @@ type ReviewItemResponse struct {
 	IntervalDays int        `json:"next_interval_days" example:"7"`
 	NextReviewAt *time.Time `json:"next_review_at"`
 	Graduated    bool       `json:"graduated" example:"false"`
+	ReviewCount  int        `json:"review_count" example:"5"`
 }
 
 // ReviewItem godoc
@@ -86,6 +87,7 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 		IntervalDays: result.IntervalDays,
 		NextReviewAt: result.NextReviewAt,
 		Graduated:    result.Graduated,
+		ReviewCount:  result.ReviewCount,
 	}
 
 	return utils.Success(c, fiber.StatusOK, message, resp, nil)
