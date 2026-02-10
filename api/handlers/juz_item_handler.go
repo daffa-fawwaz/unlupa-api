@@ -46,7 +46,7 @@ func (h *JuzItemHandler) Create(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "Invalid request body", "INVALID_REQUEST_BODY", nil)
 	}
 
-	err = h.service.AddItemToJuz(
+	result, err := h.service.AddItemToJuz(
 		userID,
 		juzID,
 		req.Mode,
@@ -57,5 +57,5 @@ func (h *JuzItemHandler) Create(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
 
-	return utils.Success(c, fiber.StatusCreated, "Hafalan added successfully", nil, nil)
+	return utils.Success(c, fiber.StatusCreated, "Hafalan added successfully", result, nil)
 }

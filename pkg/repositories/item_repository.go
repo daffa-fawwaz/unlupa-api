@@ -75,6 +75,9 @@ func (r *ItemRepository) FindByOwner(ownerID string) ([]entities.Item, error) {
 	return items, err
 }
 
-
-
-
+// FindByOwnerAndContentRef finds items by owner and content_ref (for duplicate check)
+func (r *ItemRepository) FindByOwnerAndContentRef(ownerID uuid.UUID, contentRef string) ([]entities.Item, error) {
+	var items []entities.Item
+	err := r.db.Where("owner_id = ? AND content_ref = ?", ownerID, contentRef).Find(&items).Error
+	return items, err
+}

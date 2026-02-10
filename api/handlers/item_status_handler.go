@@ -100,3 +100,56 @@ func (h *ItemStatusHandler) GetDeadlines(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusOK, "Items with deadline reached", items, nil)
 }
+
+// DeactivateItem godoc
+// @Summary Deactivate a book item
+// @Description Move book item from fsrs_active to inactive status. Only for non-quran items.
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Item}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id}/deactivate [post]
+func (h *ItemStatusHandler) DeactivateItem(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+
+	item, err := h.service.DeactivateItem(itemID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DEACTIVATE_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Item deactivated successfully", item, nil)
+}
+
+// ReactivateItem godoc
+// @Summary Reactivate a book item
+// @Description Move book item from inactive back to fsrs_active status. Only for non-quran items.
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Item}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id}/reactivate [post]
+func (h *ItemStatusHandler) ReactivateItem(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+
+	item, err := h.service.ReactivateItem(itemID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REACTIVATE_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Item reactivated successfully", item, nil)
+}
+

@@ -20,6 +20,7 @@ type ItemReviewResult struct {
 	NextReviewAt    *time.Time
 	Graduated       bool
 	PendingGraduate bool // true if waiting for teacher approval
+	ReviewCount     int  // total reviews for this item
 }
 
 type ItemReviewService struct {
@@ -84,7 +85,7 @@ func (s *ItemReviewService) ReviewItem(
 		return nil, errors.New("unauthorized")
 	}
 
-	// 3. Validate status - must be fsrs_active or graduate (for monthly review)
+	// 3. Validate status - must be fsrs_active or graduate (for periodic review)
 	if item.Status != entities.ItemStatusFSRSActive && item.Status != entities.ItemStatusGraduate {
 		return nil, errors.New("item must be in 'fsrs_active' or 'graduate' status to review")
 	}
@@ -98,8 +99,7 @@ func (s *ItemReviewService) ReviewItem(
 	isFirstReview := item.LastReviewAt == nil
 
 	// 6. Check if review is allowed (must be first review OR now >= next_review_at)
-	// Skip this check for graduate items (monthly review)
-	if item.Status == entities.ItemStatusFSRSActive && !isFirstReview && item.NextReviewAt != nil {
+	if !isFirstReview && item.NextReviewAt != nil {
 		if now.Before(*item.NextReviewAt) {
 			return nil, fmt.Errorf("review not allowed yet, next review at: %s", item.NextReviewAt.Format("2006-01-02 15:04"))
 		}
@@ -132,32 +132,52 @@ func (s *ItemReviewService) ReviewItem(
 	// 11. Update item with new FSRS state
 	item.Stability = result.NewState.Stability
 	item.Difficulty = result.NewState.Difficulty
+	item.ReviewCount++
 	item.LastReviewAt = &now
 
 	intervalDays := int(result.Interval.Hours() / 24)
 	nextReview := now.Add(result.Interval)
 	item.NextReviewAt = &nextReview
 
-	// 12. Check for graduation (interval >= 30 days) - only for fsrs_active
+	// 12. Check for graduation - ONLY for quran items in fsrs_active
+	// Book items stay in fsrs_active forever (no auto-graduation)
+	// Graduation is TIME-BASED: item must have been in fsrs_active for >= 30 days
 	graduated := false
 	pendingGraduate := false
-	if item.Status == entities.ItemStatusFSRSActive && intervalDays >= entities.GraduationIntervalDays {
-		// Check if user is in a Quran class - if yes, require teacher approval
-		if item.SourceType == "quran" && s.isUserInQuranClass(userID) {
-			item.Status = entities.ItemStatusPendingGraduate
-			pendingGraduate = true
-		} else {
-			item.Status = entities.ItemStatusGraduate
-			graduated = true
+	if item.Status == entities.ItemStatusFSRSActive &&
+		item.SourceType == "quran" &&
+		item.IntervalEndAt != nil {
+
+		// Calculate how many days the item has been in fsrs_active phase
+		// IntervalEndAt = when item entered fsrs_active (end of interval phase)
+		daysInFSRSActive := int(now.Sub(*item.IntervalEndAt).Hours() / 24)
+
+		if daysInFSRSActive >= entities.GraduationIntervalDays {
+			// Check if user is in a Quran class - if yes, require teacher approval
+			if s.isUserInQuranClass(userID) {
+				item.Status = entities.ItemStatusPendingGraduate
+				pendingGraduate = true
+			} else {
+				item.Status = entities.ItemStatusGraduate
+				graduated = true
+			}
 		}
 	}
 
-	// 13. Save item
+	// 13. If item is graduate (just graduated or already graduate), set next review to 20 days
+	if item.Status == entities.ItemStatusGraduate {
+		graduateNextReview := now.AddDate(0, 0, entities.GraduateReviewDays)
+		item.NextReviewAt = &graduateNextReview
+		nextReview = graduateNextReview
+		intervalDays = entities.GraduateReviewDays
+	}
+
+	// 14. Save item
 	if err := s.itemRepo.Update(item); err != nil {
 		return nil, err
 	}
 
-	// 14. Mark daily task as done (ignore error if not found)
+	// 15. Mark daily task as done (ignore error if not found)
 	taskDate := utils.NormalizeDate(now)
 	_ = s.dailyTaskActionRepo.UpdateStateByItemID(
 		context.Background(),
@@ -173,5 +193,7 @@ func (s *ItemReviewService) ReviewItem(
 		NextReviewAt:    &nextReview,
 		Graduated:       graduated,
 		PendingGraduate: pendingGraduate,
+		ReviewCount:     item.ReviewCount,
 	}, nil
 }
+
