@@ -14,6 +14,7 @@ type BookItem struct {
 
 	Title   string `gorm:"size:200;not null" json:"title"`
 	Content string `gorm:"type:text" json:"content"` // materi konten
+	Answer  string `gorm:"type:text" json:"answer"`  // jawaban
 	Order   int    `gorm:"not null;default:0" json:"order"`
 
 	CreatedAt time.Time `json:"created_at"`

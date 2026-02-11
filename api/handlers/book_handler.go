@@ -278,7 +278,7 @@ func (h *BookHandler) RejectBook(c *fiber.Ctx) error {
 // @Router /books/{book_id}/modules [post]
 func (h *BookHandler) AddModule(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
-	bookID := c.Params("book_id")
+	bookID := c.Params("id")
 
 	var req struct {
 		Title       string     `json:"title"`
@@ -371,11 +371,12 @@ func (h *BookHandler) DeleteModule(c *fiber.Ctx) error {
 // @Router /books/{book_id}/items [post]
 func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
-	bookID := c.Params("book_id")
+	bookID := c.Params("id")
 
 	var req struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
+		Answer  string `json:"answer"`
 		Order   int    `json:"order"`
 	}
 
@@ -383,7 +384,7 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(bookID, nil, userID, req.Title, req.Content, req.Order)
+	item, err := h.bookSvc.AddItem(bookID, nil, userID, req.Title, req.Content, req.Answer, req.Order)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -416,6 +417,7 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 		BookID  string `json:"book_id"`
 		Title   string `json:"title"`
 		Content string `json:"content"`
+		Answer  string `json:"answer"`
 		Order   int    `json:"order"`
 	}
 
@@ -423,7 +425,7 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(req.BookID, &moduleID, userID, req.Title, req.Content, req.Order)
+	item, err := h.bookSvc.AddItem(req.BookID, &moduleID, userID, req.Title, req.Content, req.Answer, req.Order)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -450,6 +452,7 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 	var req struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
+		Answer  string `json:"answer"`
 		Order   int    `json:"order"`
 	}
 
@@ -457,7 +460,7 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	item, err := h.bookSvc.UpdateItem(itemID, userID, req.Title, req.Content, req.Order)
+	item, err := h.bookSvc.UpdateItem(itemID, userID, req.Title, req.Content, req.Answer, req.Order)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_ITEM_FAILED", nil)
 	}
@@ -522,6 +525,7 @@ type UpdateModuleRequest struct {
 type AddBookItemRequest struct {
 	Title   string `json:"title" example:"Hukum Nun Mati"`
 	Content string `json:"content" example:"Penjelasan hukum nun mati..."`
+	Answer  string `json:"answer" example:"Jawaban dari pertanyaan..."`
 	Order   int    `json:"order" example:"1"`
 }
 
@@ -530,6 +534,7 @@ type AddModuleItemRequest struct {
 	BookID  string `json:"book_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Title   string `json:"title" example:"Sub Item"`
 	Content string `json:"content" example:"Konten item..."`
+	Answer  string `json:"answer" example:"Jawaban..."`
 	Order   int    `json:"order" example:"1"`
 }
 
@@ -537,6 +542,7 @@ type AddModuleItemRequest struct {
 type UpdateBookItemRequest struct {
 	Title   string `json:"title" example:"Updated Title"`
 	Content string `json:"content" example:"Updated content..."`
+	Answer  string `json:"answer" example:"Updated answer..."`
 	Order   int    `json:"order" example:"2"`
 }
 

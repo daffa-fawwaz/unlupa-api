@@ -31,8 +31,8 @@ type BookService interface {
 	DeleteModule(moduleID string, ownerID uuid.UUID) error
 
 	// Item CRUD
-	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content string, order int) (*entities.BookItem, error)
-	UpdateItem(itemID string, ownerID uuid.UUID, title, content string, order int) (*entities.BookItem, error)
+	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error)
+	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
 
 	// Memorization
@@ -320,7 +320,7 @@ func (s *bookService) DeleteModule(moduleID string, ownerID uuid.UUID) error {
 
 // ==================== ITEM CRUD ====================
 
-func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content string, order int) (*entities.BookItem, error) {
+func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error) {
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
@@ -354,6 +354,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		ModuleID:  moduleID,
 		Title:     title,
 		Content:   content,
+		Answer:    answer,
 		Order:     order,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -366,7 +367,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 	return item, nil
 }
 
-func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content string, order int) (*entities.BookItem, error) {
+func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error) {
 	item, err := s.bookItemRepo.FindByID(itemID)
 	if err != nil {
 		return nil, errors.New("item not found")
@@ -390,6 +391,9 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 	}
 	if content != "" {
 		item.Content = content
+	}
+	if answer != "" {
+		item.Answer = answer
 	}
 	if order > 0 {
 		item.Order = order

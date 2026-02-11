@@ -81,3 +81,19 @@ func (r *ItemRepository) FindByOwnerAndContentRef(ownerID uuid.UUID, contentRef 
 	err := r.db.Where("owner_id = ? AND content_ref = ?", ownerID, contentRef).Find(&items).Error
 	return items, err
 }
+
+// FindByIDs finds items by a list of IDs
+func (r *ItemRepository) FindByIDs(ids []uuid.UUID) ([]entities.Item, error) {
+	var items []entities.Item
+	err := r.db.Where("id IN ?", ids).Find(&items).Error
+	return items, err
+}
+
+// FindByOwnerAndSourceType finds items by owner and source_type
+func (r *ItemRepository) FindByOwnerAndSourceType(ownerID uuid.UUID, sourceType string) ([]entities.Item, error) {
+	var items []entities.Item
+	err := r.db.Where("owner_id = ? AND source_type = ?", ownerID, sourceType).
+		Order("created_at ASC").
+		Find(&items).Error
+	return items, err
+}

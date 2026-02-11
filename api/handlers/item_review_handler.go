@@ -7,16 +7,18 @@ import (
 	"github.com/google/uuid"
 
 	"hifzhun-api/pkg/fsrs"
+	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
 )
 
 type ItemReviewHandler struct {
-	service *services.ItemReviewService
+	service     *services.ItemReviewService
+	juzItemRepo *repositories.JuzItemRepository
 }
 
-func NewItemReviewHandler(s *services.ItemReviewService) *ItemReviewHandler {
-	return &ItemReviewHandler{service: s}
+func NewItemReviewHandler(s *services.ItemReviewService, juzItemRepo *repositories.JuzItemRepository) *ItemReviewHandler {
+	return &ItemReviewHandler{service: s, juzItemRepo: juzItemRepo}
 }
 
 // ReviewItemRequest represents item review request
@@ -34,6 +36,8 @@ type ReviewItemResponse struct {
 	NextReviewAt *time.Time `json:"next_review_at"`
 	Graduated    bool       `json:"graduated" example:"false"`
 	ReviewCount  int        `json:"review_count" example:"5"`
+	ContentRef   string     `json:"content_ref" example:"surah:78:1-5"`
+	JuzIndex     int        `json:"juz_index" example:"30"`
 }
 
 // ReviewItem godoc
@@ -79,6 +83,9 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 		message = "Item graduated! 🎉"
 	}
 
+	// Look up juz index
+	juzIndex, _ := h.juzItemRepo.FindJuzIndexByItemID(itemID.String())
+
 	resp := ReviewItemResponse{
 		ItemID:       result.Item.ID,
 		Status:       result.Item.Status,
@@ -88,6 +95,8 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 		NextReviewAt: result.NextReviewAt,
 		Graduated:    result.Graduated,
 		ReviewCount:  result.ReviewCount,
+		ContentRef:   result.Item.ContentRef,
+		JuzIndex:     juzIndex,
 	}
 
 	return utils.Success(c, fiber.StatusOK, message, resp, nil)

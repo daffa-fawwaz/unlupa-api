@@ -22,6 +22,7 @@ func SetupRoutes(
 	itemReviewHandler *handlers.ItemReviewHandler,
 	bookHandler *handlers.BookHandler,
 	classHandler *handlers.ClassHandler,
+	myItemHandler *handlers.MyItemHandler,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
@@ -38,6 +39,7 @@ func SetupRoutes(
 	RegisterItemStatusRoutes(v1, itemStatusHandler, itemReviewHandler)
 	RegisterBookRoutes(v1, bookHandler)
 	RegisterClassRoutes(v1, classHandler)
+	RegisterMyItemRoutes(v1, myItemHandler)
 }
 
 
