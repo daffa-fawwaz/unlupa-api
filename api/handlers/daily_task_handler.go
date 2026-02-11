@@ -7,24 +7,37 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 )
 
 // DailyTaskResponse represents daily task response
 type DailyTaskResponse struct {
-	ItemID   uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	CardID   uuid.UUID `json:"card_id" example:"550e8400-e29b-41d4-a716-446655440001"`
-	Source   string    `json:"source" example:"quran"`
-	State    string    `json:"state" example:"pending"`
-	TaskDate string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
+	ItemID     uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CardID     uuid.UUID `json:"card_id" example:"550e8400-e29b-41d4-a716-446655440001"`
+	Source     string    `json:"source" example:"quran"`
+	State      string    `json:"state" example:"pending"`
+	TaskDate   string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
+	ContentRef string    `json:"content_ref" example:"surah:78:1-5"`
+	JuzIndex   int       `json:"juz_index" example:"30"`
 }
 
 type DailyTaskHandler struct {
-	service services.DailyTaskService
+	service     services.DailyTaskService
+	itemRepo    *repositories.ItemRepository
+	juzItemRepo *repositories.JuzItemRepository
 }
 
-func NewDailyTaskHandler(service services.DailyTaskService) *DailyTaskHandler {
-	return &DailyTaskHandler{service: service}
+func NewDailyTaskHandler(
+	service services.DailyTaskService,
+	itemRepo *repositories.ItemRepository,
+	juzItemRepo *repositories.JuzItemRepository,
+) *DailyTaskHandler {
+	return &DailyTaskHandler{
+		service:     service,
+		itemRepo:    itemRepo,
+		juzItemRepo: juzItemRepo,
+	}
 }
 
 // GenerateToday godoc
@@ -91,14 +104,44 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
+	// Collect item IDs for batch lookup
+	itemIDs := make([]uuid.UUID, 0, len(tasks))
+	itemIDStrings := make([]string, 0, len(tasks))
+	for _, t := range tasks {
+		itemIDs = append(itemIDs, t.ItemID)
+		itemIDStrings = append(itemIDStrings, t.ItemID.String())
+	}
+
+	// Batch fetch items for content_ref
+	itemMap := make(map[uuid.UUID]string) // item_id -> content_ref
+	if len(itemIDs) > 0 {
+		items, err := h.itemRepo.FindByIDs(itemIDs)
+		if err == nil {
+			for _, item := range items {
+				itemMap[item.ID] = item.ContentRef
+			}
+		}
+	}
+
+	// Batch fetch juz indexes
+	juzMap := make(map[string]int) // item_id string -> juz_index
+	if len(itemIDStrings) > 0 {
+		juzResult, err := h.juzItemRepo.FindJuzIndexByItemIDs(itemIDStrings)
+		if err == nil {
+			juzMap = juzResult
+		}
+	}
+
 	resp := make([]DailyTaskResponse, 0, len(tasks))
 	for _, t := range tasks {
 		resp = append(resp, DailyTaskResponse{
-			ItemID:   t.ItemID,
-			CardID:   t.CardID,
-			Source:   t.Source,
-			State:    t.State,
-			TaskDate: t.TaskDate.Format("2006-01-02"),
+			ItemID:     t.ItemID,
+			CardID:     t.CardID,
+			Source:     t.Source,
+			State:      t.State,
+			TaskDate:   t.TaskDate.Format("2006-01-02"),
+			ContentRef: itemMap[t.ItemID],
+			JuzIndex:   juzMap[t.ItemID.String()],
 		})
 	}
 

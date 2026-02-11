@@ -115,13 +115,14 @@ func main() {
 	// ================= DAILY TASK =================
 	// Note: itemRepo is declared here first for daily task service
 	itemRepoForDaily := repositories.NewItemRepository(config.DB)
+	juzItemRepo := repositories.NewJuzItemRepository(config.DB)
 	dailyTaskRepo := repositories.NewDailyTaskRepository(config.DB)
 	dailyTaskSvc := services.NewDailyTaskService(
 	reviewStateRepo,
 	dailyTaskRepo,
 	itemRepoForDaily,
 )
-    dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc)
+    dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo)
 
 	
 dailyTaskActionRepo := repositories.NewDailyTaskActionRepository(config.DB)
@@ -148,7 +149,6 @@ if err != nil {
 }
 juzRepo := repositories.NewJuzRepository(config.DB)
 itemRepo := repositories.NewItemRepository(config.DB)
-juzItemRepo := repositories.NewJuzItemRepository(config.DB)
 hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
 juzHandler := handlers.NewJuzHandler(hafalanSvc)
 juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc)
@@ -173,7 +173,11 @@ classHandler := handlers.NewClassHandler(classSvc)
 
 // ================= ITEM REVIEW =================
 itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo)
-itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc)
+itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc, juzItemRepo)
+
+// ================= MY ITEMS =================
+myItemSvc := services.NewMyItemService(itemRepo, juzItemRepo, bookRepo, bookItemRepo)
+myItemHandler := handlers.NewMyItemHandler(myItemSvc)
 
 	// ================= ROUTES =================
 routes.SetupRoutes(
@@ -192,6 +196,7 @@ routes.SetupRoutes(
 	itemReviewHandler,
 	bookHandler,
 	classHandler,
+	myItemHandler,
 )
 
 
