@@ -30,12 +30,18 @@ func (s *HafalanService) CreateJuz(userID uuid.UUID, index int) (*entities.Juz, 
 		return nil, errors.New("invalid juz index")
 	}
 
+	// Check if juz already exists for this user
+	existing, err := s.juzRepo.FindByUserAndIndex(userID.String(), index)
+	if err == nil && existing != nil {
+		return nil, errors.New("juz already exists")
+	}
+
 	juz := &entities.Juz{
 		UserID: userID,
 		Index:  index,
 	}
 
-	err := s.juzRepo.Create(juz)
+	err = s.juzRepo.Create(juz)
 	return juz, err
 }
 
