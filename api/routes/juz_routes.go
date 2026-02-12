@@ -17,6 +17,7 @@ func RegisterJuzRoutes(
 		middlewares.JWTAuth(), // ✅ WAJIB
 	)
 
+	juz.Get("/", juzHandler.GetMyJuz)
 	juz.Post("/:index", juzHandler.Create)
 	juz.Post("/:juz_id/items", juzItemHandler.Create)
 }

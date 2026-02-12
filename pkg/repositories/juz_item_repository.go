@@ -87,3 +87,23 @@ func (r *JuzItemRepository) FindJuzInfoByItemIDs(itemIDs []string) (map[string]J
 	}
 	return result, nil
 }
+
+// JuzItemStatusCount holds per-status item counts for a juz
+type JuzItemStatusCount struct {
+	JuzID  string `gorm:"column:juz_id"`
+	Status string `gorm:"column:status"`
+	Count  int    `gorm:"column:count"`
+}
+
+// CountItemStatusByJuzIDs returns item counts grouped by juz_id and status
+func (r *JuzItemRepository) CountItemStatusByJuzIDs(juzIDs []string) ([]JuzItemStatusCount, error) {
+	var results []JuzItemStatusCount
+	err := r.db.
+		Table("juz_items").
+		Select("juz_items.juz_id, items.status, COUNT(*) as count").
+		Joins("JOIN items ON items.id = juz_items.item_id").
+		Where("juz_items.juz_id IN ?", juzIDs).
+		Group("juz_items.juz_id, items.status").
+		Scan(&results).Error
+	return results, err
+}
