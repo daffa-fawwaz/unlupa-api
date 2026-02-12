@@ -25,3 +25,13 @@ func (r *JuzRepository) FindByUserAndIndex(userID string, index int) (*entities.
 		First(&juz).Error
 	return &juz, err
 }
+
+// FindByUser returns all juz entries for a user, ordered by index
+func (r *JuzRepository) FindByUser(userID string) ([]entities.Juz, error) {
+	var juzs []entities.Juz
+	err := r.db.
+		Where("user_id = ?", userID).
+		Order("\"index\" ASC").
+		Find(&juzs).Error
+	return juzs, err
+}

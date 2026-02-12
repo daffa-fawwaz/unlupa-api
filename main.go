@@ -150,7 +150,7 @@ if err != nil {
 juzRepo := repositories.NewJuzRepository(config.DB)
 itemRepo := repositories.NewItemRepository(config.DB)
 hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
-juzHandler := handlers.NewJuzHandler(hafalanSvc)
+juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo)
 juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc)
 
 // ================= ITEM STATUS =================
