@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
@@ -15,10 +18,11 @@ type JuzHandler struct {
 	service     *services.HafalanService
 	juzRepo     *repositories.JuzRepository
 	juzItemRepo *repositories.JuzItemRepository
+	cache       *cache.Cache
 }
 
-func NewJuzHandler(s *services.HafalanService, juzRepo *repositories.JuzRepository, juzItemRepo *repositories.JuzItemRepository) *JuzHandler {
-	return &JuzHandler{service: s, juzRepo: juzRepo, juzItemRepo: juzItemRepo}
+func NewJuzHandler(s *services.HafalanService, juzRepo *repositories.JuzRepository, juzItemRepo *repositories.JuzItemRepository, c *cache.Cache) *JuzHandler {
+	return &JuzHandler{service: s, juzRepo: juzRepo, juzItemRepo: juzItemRepo, cache: c}
 }
 
 // Create godoc
@@ -44,7 +48,14 @@ func (h *JuzHandler) Create(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "CREATE_JUZ_FAILED", nil)
 	}
 
+	h.invalidateJuzCache(c, userID)
+
 	return utils.Success(c, fiber.StatusCreated, "Juz created successfully", juz, nil)
+}
+
+func (h *JuzHandler) invalidateJuzCache(c *fiber.Ctx, userID uuid.UUID) {
+	ctx := c.Context()
+	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
 }
 
 // JuzWithStatusCount response struct
@@ -70,6 +81,13 @@ type JuzWithStatusCount struct {
 // @Router /juz [get]
 func (h *JuzHandler) GetMyJuz(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("juz:list:%s", userID.String())
+	var cached []JuzWithStatusCount
+	if h.cache.Get(c.Context(), cacheKey, &cached) {
+		return utils.Success(c, fiber.StatusOK, "juz fetched successfully", cached, nil)
+	}
 
 	// Fetch all juz for this user
 	juzs, err := h.juzRepo.FindByUser(userID.String())
@@ -136,6 +154,9 @@ func (h *JuzHandler) GetMyJuz(c *fiber.Ctx) error {
 		}
 		resp = append(resp, entry)
 	}
+
+	// Cache and return
+	h.cache.Set(c.Context(), cacheKey, resp, 10*time.Minute)
 
 	return utils.Success(c, fiber.StatusOK, "juz fetched successfully", resp, nil)
 }

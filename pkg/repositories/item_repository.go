@@ -47,6 +47,15 @@ func (r *ItemRepository) FindIntervalDeadlineReached(now time.Time) ([]entities.
 	return items, err
 }
 
+// FindIntervalReviewDue finds items with status=interval and interval_next_review_at <= now
+func (r *ItemRepository) FindIntervalReviewDue(ownerID uuid.UUID, now time.Time) ([]entities.Item, error) {
+	var items []entities.Item
+	err := r.db.
+		Where("owner_id = ? AND status = ? AND interval_next_review_at <= ?", ownerID, entities.ItemStatusInterval, now).
+		Find(&items).Error
+	return items, err
+}
+
 // FindFSRSDueItems finds items with status=fsrs_active and next_review_at <= now
 func (r *ItemRepository) FindFSRSDueItems(ownerID uuid.UUID, now time.Time) ([]entities.Item, error) {
 	var items []entities.Item

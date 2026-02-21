@@ -1,19 +1,23 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
 )
 
 type JuzItemHandler struct {
 	service *services.HafalanService
+	cache   *cache.Cache
 }
 
-func NewJuzItemHandler(s *services.HafalanService) *JuzItemHandler {
-	return &JuzItemHandler{s}
+func NewJuzItemHandler(s *services.HafalanService, c *cache.Cache) *JuzItemHandler {
+	return &JuzItemHandler{service: s, cache: c}
 }
 
 // CreateHafalanRequest represents hafalan request body
@@ -57,5 +61,11 @@ func (h *JuzItemHandler) Create(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
 
+	// Invalidate caches
+	ctx := c.Context()
+	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
+
 	return utils.Success(c, fiber.StatusCreated, "Hafalan added successfully", result, nil)
 }
+

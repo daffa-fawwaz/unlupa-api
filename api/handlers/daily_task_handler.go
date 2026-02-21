@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 )
@@ -14,7 +16,6 @@ import (
 // DailyTaskResponse represents daily task response
 type DailyTaskResponse struct {
 	ItemID     uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	CardID     uuid.UUID `json:"card_id" example:"550e8400-e29b-41d4-a716-446655440001"`
 	Source     string    `json:"source" example:"quran"`
 	State      string    `json:"state" example:"pending"`
 	TaskDate   string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
@@ -26,17 +27,20 @@ type DailyTaskHandler struct {
 	service     services.DailyTaskService
 	itemRepo    *repositories.ItemRepository
 	juzItemRepo *repositories.JuzItemRepository
+	cache       *cache.Cache
 }
 
 func NewDailyTaskHandler(
 	service services.DailyTaskService,
 	itemRepo *repositories.ItemRepository,
 	juzItemRepo *repositories.JuzItemRepository,
+	c *cache.Cache,
 ) *DailyTaskHandler {
 	return &DailyTaskHandler{
 		service:     service,
 		itemRepo:    itemRepo,
 		juzItemRepo: juzItemRepo,
+		cache:       c,
 	}
 }
 
@@ -94,6 +98,14 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	}
 
 	now := time.Now()
+	date := now.Format("2006-01-02")
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("daily:%s:%s", userID.String(), date)
+	var cached []DailyTaskResponse
+	if h.cache.Get(c.Context(), cacheKey, &cached) {
+		return c.JSON(cached)
+	}
 
 	tasks, err := h.service.ListToday(
 		c.Context(),
@@ -136,7 +148,6 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	for _, t := range tasks {
 		resp = append(resp, DailyTaskResponse{
 			ItemID:     t.ItemID,
-			CardID:     t.CardID,
 			Source:     t.Source,
 			State:      t.State,
 			TaskDate:   t.TaskDate.Format("2006-01-02"),
@@ -144,6 +155,11 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			JuzIndex:   juzMap[t.ItemID.String()],
 		})
 	}
+
+	// Cache until midnight
+	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	ttl := time.Until(midnight)
+	h.cache.Set(c.Context(), cacheKey, resp, ttl)
 
 	return c.JSON(resp)
 }

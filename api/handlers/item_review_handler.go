@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/fsrs"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
@@ -15,10 +17,11 @@ import (
 type ItemReviewHandler struct {
 	service     *services.ItemReviewService
 	juzItemRepo *repositories.JuzItemRepository
+	cache       *cache.Cache
 }
 
-func NewItemReviewHandler(s *services.ItemReviewService, juzItemRepo *repositories.JuzItemRepository) *ItemReviewHandler {
-	return &ItemReviewHandler{service: s, juzItemRepo: juzItemRepo}
+func NewItemReviewHandler(s *services.ItemReviewService, juzItemRepo *repositories.JuzItemRepository, c *cache.Cache) *ItemReviewHandler {
+	return &ItemReviewHandler{service: s, juzItemRepo: juzItemRepo, cache: c}
 }
 
 // ReviewItemRequest represents item review request
@@ -98,6 +101,13 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 		ContentRef:   result.Item.ContentRef,
 		JuzIndex:     juzIndex,
 	}
+
+	// Invalidate caches
+	ctx := c.Context()
+	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
+	date := time.Now().Format("2006-01-02")
+	h.cache.Delete(ctx, fmt.Sprintf("daily:%s:%s", userID.String(), date))
 
 	return utils.Success(c, fiber.StatusOK, message, resp, nil)
 }

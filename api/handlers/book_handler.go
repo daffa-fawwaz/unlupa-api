@@ -1,6 +1,10 @@
 package handlers
 
 import (
+	"time"
+
+	"hifzhun-api/pkg/cache"
+	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
 
@@ -10,10 +14,11 @@ import (
 
 type BookHandler struct {
 	bookSvc services.BookService
+	cache   *cache.Cache
 }
 
-func NewBookHandler(bookSvc services.BookService) *BookHandler {
-	return &BookHandler{bookSvc}
+func NewBookHandler(bookSvc services.BookService, c *cache.Cache) *BookHandler {
+	return &BookHandler{bookSvc: bookSvc, cache: c}
 }
 
 // ==================== BOOK ENDPOINTS ====================
@@ -81,10 +86,19 @@ func (h *BookHandler) GetMyBooks(c *fiber.Ctx) error {
 // @Failure 500 {object} utils.ErrorResponse
 // @Router /books/published [get]
 func (h *BookHandler) GetPublishedBooks(c *fiber.Ctx) error {
+	// Try cache first
+	cacheKey := "books:published"
+	var cached []entities.Book
+	if h.cache.Get(c.Context(), cacheKey, &cached) {
+		return utils.Success(c, fiber.StatusOK, "published books fetched successfully", cached, nil)
+	}
+
 	books, err := h.bookSvc.GetPublishedBooks()
 	if err != nil {
 		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_BOOKS_FAILED", nil)
 	}
+
+	h.cache.Set(c.Context(), cacheKey, books, 30*time.Minute)
 
 	return utils.Success(c, fiber.StatusOK, "published books fetched successfully", books, nil)
 }
@@ -192,6 +206,9 @@ func (h *BookHandler) RequestPublish(c *fiber.Ctx) error {
 	if err := h.bookSvc.RequestPublish(bookID, userID); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REQUEST_PUBLISH_FAILED", nil)
 	}
+
+	// Invalidate published books cache
+	h.cache.Delete(c.Context(), "books:published")
 
 	return utils.Success(c, fiber.StatusOK, "publish request submitted successfully", nil, nil)
 }

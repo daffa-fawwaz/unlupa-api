@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,14 +11,13 @@ import (
 	"hifzhun-api/api/handlers"
 	"hifzhun-api/api/routes"
 	_ "hifzhun-api/docs" // swagger docs
+	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/repositories"
-	"hifzhun-api/pkg/seeders"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/usecases"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -43,27 +41,11 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
-	seedFlag := flag.Bool("seed", false, "Run database seeders")
-	flag.Parse()
-
 	godotenv.Load()
 
 	config.ConnectDatabase()
-
-	if *seedFlag {
-		log.Println("Running seeders...")
-		ownerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-		if err := seeders.SeedFSRSWeights(config.DB); err != nil {
-			log.Fatalf("Failed to seed FSRS weights: %v", err)
-		}
-		if err := seeders.SeedItems(config.DB, ownerID); err != nil {
-			log.Fatalf("Failed to seed items: %v", err)
-		}
-		if err := seeders.SeedCards(config.DB); err != nil {
-			log.Fatalf("Failed to seed cards: %v", err)
-		}
-		log.Println("Seeders completed successfully")
-	}
+	config.InitRedis()
+	appCache := cache.New(config.RedisClient)
 
 	app := fiber.New()
 
@@ -81,8 +63,6 @@ func main() {
 	userRepo := repositories.NewUserRepository(config.DB)
 	teacherReqRepo := repositories.NewTeacherRequestRepository(config.DB)
 	reviewStateRepo := repositories.NewReviewStateRepository(config.DB)
-	cardRepo := repositories.NewCardRepository(config.DB)
-	reviewLogRepo := repositories.NewReviewLogRepository(config.DB)
 	fsrsWeightsRepo := repositories.NewFSRSWeightsRepository(config.DB)
 
 	// ================= AUTH =================
@@ -102,16 +82,6 @@ func main() {
 	loadControlSvc := services.NewLoadControlService(reviewStateRepo)
 	loadControlHandler := handlers.NewLoadControlHandler(loadControlSvc)
 
-	// ================= CARD / REVIEW =================
-	reviewSvc := services.NewReviewService(
-	config.DB,
-	cardRepo,
-	reviewLogRepo,
-	reviewStateRepo,
-	fsrsWeightsRepo,
-)
-	cardHandler := handlers.NewCardHandler(reviewSvc)
-
 	// ================= DAILY TASK =================
 	// Note: itemRepo is declared here first for daily task service
 	itemRepoForDaily := repositories.NewItemRepository(config.DB)
@@ -122,18 +92,11 @@ func main() {
 	dailyTaskRepo,
 	itemRepoForDaily,
 )
-    dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo)
+    dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo, appCache)
 
-	
+
 dailyTaskActionRepo := repositories.NewDailyTaskActionRepository(config.DB)
 
-dailyTaskActionSvc := services.NewDailyTaskActionService(
-	dailyTaskActionRepo,
-)
-
-dailyTaskActionHandler := handlers.NewDailyTaskActionHandler(
-	dailyTaskActionSvc,
-)
 
 
 // graduation engine
@@ -150,11 +113,12 @@ if err != nil {
 juzRepo := repositories.NewJuzRepository(config.DB)
 itemRepo := repositories.NewItemRepository(config.DB)
 hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
-juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo)
-juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc)
+juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo, appCache)
+juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc, appCache)
 
 // ================= ITEM STATUS =================
-itemStatusSvc := services.NewItemStatusService(itemRepo)
+intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)
+itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo)
 itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc)
 
 // ================= BOOK =================
@@ -162,7 +126,7 @@ bookRepo := repositories.NewBookRepository(config.DB)
 bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
 bookItemRepo := repositories.NewBookItemRepository(config.DB)
 bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo)
-bookHandler := handlers.NewBookHandler(bookSvc)
+bookHandler := handlers.NewBookHandler(bookSvc, appCache)
 
 // ================= CLASS =================
 classRepo := repositories.NewClassRepository(config.DB)
@@ -173,11 +137,11 @@ classHandler := handlers.NewClassHandler(classSvc)
 
 // ================= ITEM REVIEW =================
 itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo)
-itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc, juzItemRepo)
+itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc, juzItemRepo, appCache)
 
 // ================= MY ITEMS =================
 myItemSvc := services.NewMyItemService(itemRepo, juzItemRepo, bookRepo, bookItemRepo)
-myItemHandler := handlers.NewMyItemHandler(myItemSvc)
+myItemHandler := handlers.NewMyItemHandler(myItemSvc, appCache)
 
 	// ================= ROUTES =================
 routes.SetupRoutes(
@@ -186,9 +150,7 @@ routes.SetupRoutes(
 	userHandler,
 	teacherReqHandler,
 	loadControlHandler,
-	cardHandler,
 	dailyTaskHandler,
-	dailyTaskActionHandler,
 	graduationPreEngineHandler,
 	juzHandler,
 	juzItemHandler,
