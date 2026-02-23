@@ -11,14 +11,21 @@ import (
 )
 
 type ItemStatusService struct {
-	itemRepo *repositories.ItemRepository
+	itemRepo            *repositories.ItemRepository
+	intervalReviewRepo  *repositories.IntervalReviewLogRepository
 }
 
-func NewItemStatusService(itemRepo *repositories.ItemRepository) *ItemStatusService {
-	return &ItemStatusService{itemRepo: itemRepo}
+func NewItemStatusService(
+	itemRepo *repositories.ItemRepository,
+	intervalReviewRepo *repositories.IntervalReviewLogRepository,
+) *ItemStatusService {
+	return &ItemStatusService{
+		itemRepo:           itemRepo,
+		intervalReviewRepo: intervalReviewRepo,
+	}
 }
 
-// StartInterval moves item from menghafal → interval
+// StartInterval moves item from menghafal → interval (recurring review)
 func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, intervalDays int) (*entities.Item, error) {
 	item, err := s.itemRepo.GetByID(itemID)
 	if err != nil {
@@ -40,14 +47,155 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 		return nil, errors.New("interval_days must be at least 1")
 	}
 
-	// Transition to interval
+	// Transition to interval with recurring review
 	now := time.Now()
-	endAt := now.AddDate(0, 0, intervalDays)
+	nextReview := now.AddDate(0, 0, intervalDays)
 
 	item.Status = entities.ItemStatusInterval
 	item.IntervalDays = intervalDays
 	item.IntervalStartAt = &now
-	item.IntervalEndAt = &endAt
+	item.IntervalNextReviewAt = &nextReview
+
+	if err := s.itemRepo.Update(item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+
+// IntervalReviewResult represents the result of an interval review
+type IntervalReviewResult struct {
+	Item         *entities.Item `json:"item"`
+	NextReviewAt *time.Time     `json:"next_review_at"`
+	Rating       int            `json:"rating"`
+}
+
+// ReviewInterval reviews an item in the interval phase
+func (s *ItemStatusService) ReviewInterval(itemID uuid.UUID, userID uuid.UUID, rating int) (*IntervalReviewResult, error) {
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+
+	// Validate ownership
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	// Validate status
+	if item.Status != entities.ItemStatusInterval {
+		return nil, errors.New("item must be in 'interval' status to review")
+	}
+
+	// Validate rating (1=bad, 2=good, 3=perfect)
+	if rating < 1 || rating > 3 {
+		return nil, errors.New("rating must be between 1 and 3 (1=bad, 2=good, 3=perfect)")
+	}
+
+	// Check if review is allowed (now >= interval_next_review_at)
+	now := time.Now()
+	if item.IntervalNextReviewAt != nil && now.Before(*item.IntervalNextReviewAt) {
+		return nil, errors.New("review not allowed yet, next review at: " + item.IntervalNextReviewAt.Format("2006-01-02 15:04"))
+	}
+
+	// Save review log
+	reviewLog := &entities.IntervalReviewLog{
+		UserID:     userID,
+		ItemID:     itemID,
+		Rating:     rating,
+		ReviewedAt: now,
+	}
+	if err := s.intervalReviewRepo.Create(reviewLog); err != nil {
+		return nil, err
+	}
+
+	// Update next review date
+	nextReview := now.AddDate(0, 0, item.IntervalDays)
+	item.IntervalNextReviewAt = &nextReview
+	item.ReviewCount++
+	item.LastReviewAt = &now
+
+	if err := s.itemRepo.Update(item); err != nil {
+		return nil, err
+	}
+
+	return &IntervalReviewResult{
+		Item:         item,
+		NextReviewAt: &nextReview,
+		Rating:       rating,
+	}, nil
+}
+
+// IntervalStatsResult represents interval review statistics
+type IntervalStatsResult struct {
+	AverageRating float64 `json:"average_rating"`
+	TotalReviews  int     `json:"total_reviews"`
+	Performance   string  `json:"performance"` // bad, good, perfect
+}
+
+// GetIntervalReviewStats calculates the average rating and performance label
+func (s *ItemStatusService) GetIntervalReviewStats(itemID uuid.UUID, userID uuid.UUID) (*IntervalStatsResult, error) {
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+
+	// Validate ownership
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	avg, count, err := s.intervalReviewRepo.GetAverageRatingByItemID(itemID)
+	if err != nil {
+		return nil, err
+	}
+
+	if count == 0 {
+		return &IntervalStatsResult{
+			AverageRating: 0,
+			TotalReviews:  0,
+			Performance:   "no_reviews",
+		}, nil
+	}
+
+	// Determine performance label
+	var performance string
+	if avg < 1.5 {
+		performance = "bad"
+	} else if avg < 2.5 {
+		performance = "good"
+	} else {
+		performance = "perfect"
+	}
+
+	return &IntervalStatsResult{
+		AverageRating: avg,
+		TotalReviews:  count,
+		Performance:   performance,
+	}, nil
+}
+
+// ActivateToFSRS moves item from interval → fsrs_active (user decision)
+func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+
+	// Validate ownership
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	// Validate status
+	if item.Status != entities.ItemStatusInterval {
+		return nil, errors.New("item must be in 'interval' status to activate FSRS")
+	}
+
+	// Transition to fsrs_active
+	now := time.Now()
+	item.Status = entities.ItemStatusFSRSActive
+	item.IntervalEndAt = &now // Mark when interval ended
 
 	if err := s.itemRepo.Update(item); err != nil {
 		return nil, err
@@ -179,4 +327,3 @@ func (s *ItemStatusService) ReactivateItem(itemID uuid.UUID, userID uuid.UUID) (
 
 	return item, nil
 }
-

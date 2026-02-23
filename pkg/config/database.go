@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"hifzhun-api/pkg/entities"
-	"hifzhun-api/pkg/seeders"
 	"log"
 	"os"
 
@@ -66,6 +65,7 @@ func ConnectDatabase() {
 		&entities.BookModule{},
 		&entities.BookItem{},
 		&entities.ClassBook{},
+		&entities.IntervalReviewLog{},
 
 	)
 	if err != nil {
@@ -73,18 +73,5 @@ func ConnectDatabase() {
 	}
 
 	log.Println("✅ Database connected and migrated successfully!")
-
-	// Run seeders
-	var seedUser entities.User
-	if err := db.First(&seedUser).Error; err == nil {
-		if err := seeders.SeedItems(db, seedUser.ID); err != nil {
-			log.Println("⚠️  Failed to seed items:", err)
-		} else {
-			log.Println("✅ Items seeded successfully!")
-		}
-	} else {
-		log.Println("⚠️  No user found, skipping item seeder")
-	}
-
 }
 

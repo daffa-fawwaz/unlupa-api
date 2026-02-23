@@ -84,6 +84,25 @@ func (s *dailyTaskService) GenerateToday(
 		s.itemRepo.Update(&item)
 	}
 
+	// ========== 1.5️⃣ Items Interval yang due untuk recurring review ==========
+	intervalReviewDueItems, err := s.itemRepo.FindIntervalReviewDue(userID, now)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range intervalReviewDueItems {
+		tasks = append(tasks, entities.DailyTask{
+			ID:        uuid.New(),
+			UserID:    userID,
+			ItemID:    item.ID,
+			CardID:    uuid.Nil,
+			TaskDate:  taskDate,
+			Source:    "interval_review", // Mark as interval recurring review
+			State:     "pending",
+			CreatedAt: now,
+		})
+	}
+
 	// ========== 2️⃣ Items FSRS Active yang due untuk review ==========
 	fsrsItems, err := s.itemRepo.FindFSRSDueItems(userID, now)
 	if err != nil {

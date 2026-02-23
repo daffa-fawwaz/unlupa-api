@@ -38,7 +38,7 @@ func JWTAuth() fiber.Handler {
 		tokenStr := parts[1]
 		secret := os.Getenv("JWT_SECRET")
 		if secret == "" {
-			secret = "your-secret-key"
+			panic("JWT_SECRET environment variable is not set")
 		}
 
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {

@@ -12,9 +12,7 @@ func SetupRoutes(
 	userHandler *handlers.UserHandler,
 	teacherReqHandler *handlers.TeacherRequestHandler,
 	loadControlHandler *handlers.LoadControlHandler,
-	cardHandler *handlers.CardHandler,
 	dailyTaskHandler *handlers.DailyTaskHandler,
-	dailyTaskActionHandler *handlers.DailyTaskActionHandler,
 	graduationPreEngineHandler *handlers.GraduationPreEngineHandler,
 	juzHandler *handlers.JuzHandler,
 	juzItemHandler *handlers.JuzItemHandler,
@@ -31,9 +29,7 @@ func SetupRoutes(
 	UserRoutes(v1, teacherReqHandler)
 	AdminRoutes(v1, userHandler, teacherReqHandler, bookHandler)
 	RegisterLoadControlRoutes(v1, loadControlHandler)
-	RegisterCardRoutes(v1, cardHandler)
 	RegisterDailyTaskRoutes(v1, dailyTaskHandler)
-	RegisterDailyTaskActionRoutes(v1, dailyTaskActionHandler)
 	RegisterGraduationPreEngineRoutes(v1, graduationPreEngineHandler)
 	RegisterJuzRoutes(v1, juzHandler, juzItemHandler)
 	RegisterItemStatusRoutes(v1, itemStatusHandler, itemReviewHandler)

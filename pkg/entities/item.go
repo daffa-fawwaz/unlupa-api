@@ -31,9 +31,10 @@ type Item struct {
 
 	// Status State Machine
 	Status          string     `gorm:"type:varchar(20);not null;default:'menghafal'"` // menghafal | interval | fsrs_active | pending_graduate | graduate
-	IntervalDays    int        `gorm:"default:0"`                                      // Custom interval days (for interval phase)
-	IntervalStartAt *time.Time `gorm:"type:timestamp"`                                 // When interval started
-	IntervalEndAt   *time.Time `gorm:"type:timestamp"`                                 // Deadline for interval
+	IntervalDays         int        `gorm:"default:0"`          // Custom interval days (for interval phase)
+	IntervalStartAt      *time.Time `gorm:"type:timestamp"`     // When interval started
+	IntervalEndAt        *time.Time `gorm:"type:timestamp"`     // Legacy: deadline for interval (kept for compatibility)
+	IntervalNextReviewAt *time.Time `gorm:"type:timestamp"`     // Next recurring interval review date
 
 	// FSRS Fields (for fsrs_active phase)
 	Stability    float64    `gorm:"default:0"`

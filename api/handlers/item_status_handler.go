@@ -23,7 +23,7 @@ type StartIntervalRequest struct {
 
 // StartInterval godoc
 // @Summary Start interval phase for item
-// @Description Move item from menghafal to interval phase
+// @Description Move item from menghafal to interval phase with recurring review
 // @Tags Item Status
 // @Accept json
 // @Produce json
@@ -50,7 +50,147 @@ func (h *ItemStatusHandler) StartInterval(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "START_INTERVAL_FAILED", nil)
 	}
 
-	return utils.Success(c, fiber.StatusOK, "Item moved to interval phase", item, nil)
+	return utils.Success(c, fiber.StatusOK, "Item moved to interval phase with recurring review", item, nil)
+}
+
+// ReviewIntervalRequest represents interval review request
+type ReviewIntervalRequest struct {
+	Rating int `json:"rating" example:"3" minimum:"1" maximum:"3"` // 1=bad, 2=good, 3=perfect
+}
+
+// ReviewIntervalResponse represents interval review response
+type ReviewIntervalResponse struct {
+	ItemID               uuid.UUID  `json:"item_id"`
+	Status               string     `json:"status"`
+	Rating               int        `json:"rating"`
+	RatingLabel          string     `json:"rating_label"`
+	IntervalDays         int        `json:"interval_days"`
+	IntervalNextReviewAt *string    `json:"interval_next_review_at"`
+	ReviewCount          int        `json:"review_count"`
+	ContentRef           string     `json:"content_ref"`
+}
+
+// ReviewInterval godoc
+// @Summary Review an item in interval phase
+// @Description Submit a review rating for an item during interval phase (1=bad, 2=good, 3=perfect)
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Param request body ReviewIntervalRequest true "Review rating (1=bad, 2=good, 3=perfect)"
+// @Success 200 {object} utils.SuccessResponse{data=ReviewIntervalResponse}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id}/review-interval [post]
+func (h *ItemStatusHandler) ReviewInterval(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+
+	var req ReviewIntervalRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid request body", "INVALID_REQUEST_BODY", nil)
+	}
+
+	if req.Rating < 1 || req.Rating > 3 {
+		return utils.Error(c, fiber.StatusBadRequest, "Rating must be between 1 and 3 (1=bad, 2=good, 3=perfect)", "INVALID_RATING", nil)
+	}
+
+	result, err := h.service.ReviewInterval(itemID, userID, req.Rating)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REVIEW_INTERVAL_FAILED", nil)
+	}
+
+	// Map rating to label
+	ratingLabels := map[int]string{1: "bad", 2: "good", 3: "perfect"}
+
+	var nextReviewStr *string
+	if result.NextReviewAt != nil {
+		s := result.NextReviewAt.Format("2006-01-02 15:04")
+		nextReviewStr = &s
+	}
+
+	resp := ReviewIntervalResponse{
+		ItemID:               result.Item.ID,
+		Status:               result.Item.Status,
+		Rating:               result.Rating,
+		RatingLabel:          ratingLabels[result.Rating],
+		IntervalDays:         result.Item.IntervalDays,
+		IntervalNextReviewAt: nextReviewStr,
+		ReviewCount:          result.Item.ReviewCount,
+		ContentRef:           result.Item.ContentRef,
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Interval review submitted", resp, nil)
+}
+
+// IntervalStatsResponse represents interval stats response
+type IntervalStatsResponse struct {
+	ItemID        uuid.UUID `json:"item_id"`
+	AverageRating float64   `json:"average_rating"`
+	TotalReviews  int       `json:"total_reviews"`
+	Performance   string    `json:"performance"` // bad, good, perfect, no_reviews
+}
+
+// GetIntervalStats godoc
+// @Summary Get interval review statistics
+// @Description Get average rating and performance label for an item's interval reviews
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse{data=IntervalStatsResponse}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id}/interval-stats [get]
+func (h *ItemStatusHandler) GetIntervalStats(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+
+	stats, err := h.service.GetIntervalReviewStats(itemID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "GET_STATS_FAILED", nil)
+	}
+
+	resp := IntervalStatsResponse{
+		ItemID:        itemID,
+		AverageRating: stats.AverageRating,
+		TotalReviews:  stats.TotalReviews,
+		Performance:   stats.Performance,
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Interval review statistics", resp, nil)
+}
+
+// ActivateToFSRS godoc
+// @Summary Activate item to FSRS phase
+// @Description Move item from interval to fsrs_active phase (user decision)
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Item}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id}/activate-fsrs [post]
+func (h *ItemStatusHandler) ActivateToFSRS(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+
+	item, err := h.service.ActivateToFSRS(itemID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ACTIVATE_FSRS_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Item moved to FSRS active phase", item, nil)
 }
 
 // GetByStatus godoc
@@ -152,4 +292,3 @@ func (h *ItemStatusHandler) ReactivateItem(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusOK, "Item reactivated successfully", item, nil)
 }
-
