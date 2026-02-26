@@ -49,7 +49,18 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 
 	// Transition to interval with recurring review
 	now := time.Now()
-	nextReview := now.AddDate(0, 0, intervalDays)
+
+// Target date (hari + interval)
+targetDate := now.AddDate(0, 0, intervalDays)
+
+// Normalize ke jam 00:00:00
+nextReview := time.Date(
+	targetDate.Year(),
+	targetDate.Month(),
+	targetDate.Day(),
+	0, 0, 0, 0,
+	targetDate.Location(),
+)
 
 	item.Status = entities.ItemStatusInterval
 	item.IntervalDays = intervalDays
@@ -110,7 +121,16 @@ func (s *ItemStatusService) ReviewInterval(itemID uuid.UUID, userID uuid.UUID, r
 	}
 
 	// Update next review date
-	nextReview := now.AddDate(0, 0, item.IntervalDays)
+
+	targetDate := now.AddDate(0, 0, item.IntervalDays)
+
+	nextReview := time.Date(
+		targetDate.Year(),
+		targetDate.Month(),
+		targetDate.Day(),
+		0, 0, 0, 0,
+		targetDate.Location(),
+	)
 	item.IntervalNextReviewAt = &nextReview
 	item.ReviewCount++
 	item.LastReviewAt = &now
@@ -182,20 +202,31 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 		return nil, errors.New("item not found")
 	}
 
-	// Validate ownership
 	if item.OwnerID != userID {
 		return nil, errors.New("unauthorized")
 	}
 
-	// Validate status
 	if item.Status != entities.ItemStatusInterval {
 		return nil, errors.New("item must be in 'interval' status to activate FSRS")
 	}
 
-	// Transition to fsrs_active
 	now := time.Now()
+
+	// Hitung next review berdasarkan interval sebelumnya
+	targetDate := now.AddDate(0, 0, item.IntervalDays)
+
+	// Normalize ke 00:00
+	nextReview := time.Date(
+		targetDate.Year(),
+		targetDate.Month(),
+		targetDate.Day(),
+		0, 0, 0, 0,
+		targetDate.Location(),
+	)
+
 	item.Status = entities.ItemStatusFSRSActive
-	item.IntervalEndAt = &now // Mark when interval ended
+	item.IntervalEndAt = &now
+	item.NextReviewAt = &nextReview // ✅ INI YANG PENTING
 
 	if err := s.itemRepo.Update(item); err != nil {
 		return nil, err
