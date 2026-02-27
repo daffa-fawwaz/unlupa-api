@@ -26,6 +26,9 @@ func Review(
 
 	R := Retrievability(elapsed, state.Stability)
 	Dnew := UpdateDifficulty(state.Difficulty, rating, w)
+	if math.IsNaN(Dnew) || math.IsInf(Dnew, 0) || Dnew <= 0 {
+		Dnew = w.W[1] // initial difficulty default
+	}
 
 	var Snew float64
 
@@ -38,7 +41,7 @@ func Review(
 			math.Exp(w.W[5])*
 				(11-state.Difficulty)*
 				math.Pow(state.Stability, -w.W[6])*
-				(math.Exp((1-R)*w.W[7]) - 1))
+				(math.Exp((1-R)*w.W[7])-1))
 
 		if rating == Hard {
 			Snew *= w.W[8]
@@ -48,6 +51,10 @@ func Review(
 		}
 	}
 
+	// Protect JSON encoding + downstream logic from NaN/Inf.
+	if math.IsNaN(Snew) || math.IsInf(Snew, 0) {
+		Snew = 0.01
+	}
 	if Snew < 0.01 {
 		Snew = 0.01
 	}

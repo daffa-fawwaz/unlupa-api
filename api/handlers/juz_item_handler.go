@@ -22,8 +22,10 @@ func NewJuzItemHandler(s *services.HafalanService, c *cache.Cache) *JuzItemHandl
 
 // CreateHafalanRequest represents hafalan request body
 type CreateHafalanRequest struct {
-	Mode       string `json:"mode" example:"surah"`             // surah | page
-	ContentRef string `json:"content_ref" example:"surah:78:1-5"` // surah:78:1-5 | page:582
+	Mode        string `json:"mode" example:"surah"`               // surah | page
+	ContentRef  string `json:"content_ref" example:"surah:78:1-5"` // surah:78:1-5 | page:582 or page:585-589
+	EstimateVal int    `json:"estimate_value,omitempty" example:"45"` // nilai estimasi
+	EstimateUnit string `json:"estimate_unit,omitempty" example:"seconds"` // seconds | minutes
 }
 
 // Create godoc
@@ -55,6 +57,8 @@ func (h *JuzItemHandler) Create(c *fiber.Ctx) error {
 		juzID,
 		req.Mode,
 		req.ContentRef,
+		req.EstimateVal,
+		req.EstimateUnit,
 	)
 
 	if err != nil {
@@ -68,4 +72,3 @@ func (h *JuzItemHandler) Create(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusCreated, "Hafalan added successfully", result, nil)
 }
-

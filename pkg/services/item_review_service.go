@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,6 +111,14 @@ func (s *ItemReviewService) ReviewItem(
 		item.Stability = 0.4
 		item.Difficulty = 5.0
 	}
+	// Guard for items coming from interval phase: they can have LastReviewAt set
+	// but still have zero/invalid FSRS params, which can produce NaN.
+	if math.IsNaN(item.Stability) || math.IsInf(item.Stability, 0) || item.Stability <= 0 {
+		item.Stability = 0.4
+	}
+	if math.IsNaN(item.Difficulty) || math.IsInf(item.Difficulty, 0) || item.Difficulty <= 0 {
+		item.Difficulty = 5.0
+	}
 
 	// 8. Use default FSRS weights (simpler, no DB query needed)
 	weights := fsrs.DefaultWeights()
@@ -132,11 +141,19 @@ func (s *ItemReviewService) ReviewItem(
 	// 11. Update item with new FSRS state
 	item.Stability = result.NewState.Stability
 	item.Difficulty = result.NewState.Difficulty
+	if math.IsNaN(item.Stability) || math.IsInf(item.Stability, 0) || item.Stability <= 0 {
+		item.Stability = 0.01
+	}
+	if math.IsNaN(item.Difficulty) || math.IsInf(item.Difficulty, 0) || item.Difficulty <= 0 {
+		item.Difficulty = 5.0
+	}
 	item.ReviewCount++
 	item.LastReviewAt = &now
 
 	intervalDays := int(result.Interval.Hours() / 24)
+	// Normalize next review time to 00:00:00
 	nextReview := now.Add(result.Interval)
+	nextReview = time.Date(nextReview.Year(), nextReview.Month(), nextReview.Day(), 0, 0, 0, 0, nextReview.Location())
 	item.NextReviewAt = &nextReview
 
 	// 12. Check for graduation - ONLY for quran items in fsrs_active
@@ -145,14 +162,20 @@ func (s *ItemReviewService) ReviewItem(
 	graduated := false
 	pendingGraduate := false
 	if item.Status == entities.ItemStatusFSRSActive &&
-		item.SourceType == "quran" &&
-		item.IntervalEndAt != nil {
+		item.SourceType == "quran" {
 
 		// Calculate how many days the item has been in fsrs_active phase
-		// IntervalEndAt = when item entered fsrs_active (end of interval phase)
-		daysInFSRSActive := int(now.Sub(*item.IntervalEndAt).Hours() / 24)
+		// FSRSStartAt = when item entered fsrs_active (day 1)
+		daysInFSRSActive := 0
+		if item.FSRSStartAt != nil {
+			daysInFSRSActive = int(now.Sub(*item.FSRSStartAt).Hours() / 24)
+		} else if item.IntervalEndAt != nil {
+			// Fallback for legacy records
+			daysInFSRSActive = int(now.Sub(*item.IntervalEndAt).Hours() / 24)
+		}
 
-		if daysInFSRSActive >= entities.GraduationIntervalDays {
+		// Graduate if days in fsrs_active >= threshold OR stability >= threshold
+		if daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold {
 			// Check if user is in a Quran class - if yes, require teacher approval
 			if s.isUserInQuranClass(userID) {
 				item.Status = entities.ItemStatusPendingGraduate
@@ -167,6 +190,8 @@ func (s *ItemReviewService) ReviewItem(
 	// 13. If item is graduate (just graduated or already graduate), set next review to 20 days
 	if item.Status == entities.ItemStatusGraduate {
 		graduateNextReview := now.AddDate(0, 0, entities.GraduateReviewDays)
+		// Normalize next review time to 00:00:00
+		graduateNextReview = time.Date(graduateNextReview.Year(), graduateNextReview.Month(), graduateNextReview.Day(), 0, 0, 0, 0, graduateNextReview.Location())
 		item.NextReviewAt = &graduateNextReview
 		nextReview = graduateNextReview
 		intervalDays = entities.GraduateReviewDays
@@ -196,4 +221,3 @@ func (s *ItemReviewService) ReviewItem(
 		ReviewCount:     item.ReviewCount,
 	}, nil
 }
-

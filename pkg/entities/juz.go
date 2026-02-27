@@ -12,6 +12,8 @@ type Juz struct {
 	UserID  uuid.UUID `gorm:"type:uuid;not null;index"`
 	Index   int       `gorm:"not null"` // 1 - 30
 
+	IsActive bool `gorm:"default:true"`
+
 	CreatedAt time.Time
 }
 

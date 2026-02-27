@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,8 +12,8 @@ import (
 )
 
 type ItemStatusService struct {
-	itemRepo            *repositories.ItemRepository
-	intervalReviewRepo  *repositories.IntervalReviewLogRepository
+	itemRepo           *repositories.ItemRepository
+	intervalReviewRepo *repositories.IntervalReviewLogRepository
 }
 
 func NewItemStatusService(
@@ -37,9 +38,9 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 		return nil, errors.New("unauthorized")
 	}
 
-	// Validate current status
-	if item.Status != entities.ItemStatusMenghafal {
-		return nil, errors.New("item must be in 'menghafal' status to start interval")
+	// Validate current status: allow from 'menghafal' or 'fsrs_active'
+	if item.Status != entities.ItemStatusMenghafal && item.Status != entities.ItemStatusFSRSActive {
+		return nil, errors.New("item must be in 'menghafal' or 'fsrs_active' status to start interval")
 	}
 
 	// Validate interval days
@@ -50,22 +51,24 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 	// Transition to interval with recurring review
 	now := time.Now()
 
-// Target date (hari + interval)
-targetDate := now.AddDate(0, 0, intervalDays)
+	// Target date (hari + interval)
+	targetDate := now.AddDate(0, 0, intervalDays)
 
-// Normalize ke jam 00:00:00
-nextReview := time.Date(
-	targetDate.Year(),
-	targetDate.Month(),
-	targetDate.Day(),
-	0, 0, 0, 0,
-	targetDate.Location(),
-)
+	// Normalize ke jam 00:00:00
+	nextReview := time.Date(
+		targetDate.Year(),
+		targetDate.Month(),
+		targetDate.Day(),
+		0, 0, 0, 0,
+		targetDate.Location(),
+	)
 
 	item.Status = entities.ItemStatusInterval
 	item.IntervalDays = intervalDays
 	item.IntervalStartAt = &now
 	item.IntervalNextReviewAt = &nextReview
+	// Clear FSRS scheduling if transitioning back from fsrs_active
+	item.NextReviewAt = nil
 
 	if err := s.itemRepo.Update(item); err != nil {
 		return nil, err
@@ -226,7 +229,17 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 
 	item.Status = entities.ItemStatusFSRSActive
 	item.IntervalEndAt = &now
+	item.FSRSStartAt = &now
 	item.NextReviewAt = &nextReview // ✅ INI YANG PENTING
+	// Ensure FSRS params are valid when entering fsrs_active.
+	// Items coming from interval phase may have LastReviewAt set (interval reviews),
+	// but Stability was never initialized, which can produce NaN in FSRS math.
+	if math.IsNaN(item.Stability) || math.IsInf(item.Stability, 0) || item.Stability <= 0 {
+		item.Stability = 0.4
+	}
+	if math.IsNaN(item.Difficulty) || math.IsInf(item.Difficulty, 0) || item.Difficulty <= 0 {
+		item.Difficulty = 5.0
+	}
 
 	if err := s.itemRepo.Update(item); err != nil {
 		return nil, err

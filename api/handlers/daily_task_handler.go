@@ -21,6 +21,7 @@ type DailyTaskResponse struct {
 	TaskDate   string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
 	ContentRef string    `json:"content_ref" example:"surah:78:1-5"`
 	JuzIndex   int       `json:"juz_index" example:"30"`
+	EstimatedReviewSeconds int `json:"estimated_review_seconds" example:"120"`
 }
 
 type DailyTaskHandler struct {
@@ -124,13 +125,14 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		itemIDStrings = append(itemIDStrings, t.ItemID.String())
 	}
 
-	// Batch fetch items for content_ref
-	itemMap := make(map[uuid.UUID]string) // item_id -> content_ref
+	itemMap := make(map[uuid.UUID]string)
+	itemEstimateMap := make(map[uuid.UUID]int)
 	if len(itemIDs) > 0 {
 		items, err := h.itemRepo.FindByIDs(itemIDs)
 		if err == nil {
 			for _, item := range items {
 				itemMap[item.ID] = item.ContentRef
+				itemEstimateMap[item.ID] = item.EstimatedReviewSeconds
 			}
 		}
 	}
@@ -153,6 +155,7 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			TaskDate:   t.TaskDate.Format("2006-01-02"),
 			ContentRef: itemMap[t.ItemID],
 			JuzIndex:   juzMap[t.ItemID.String()],
+			EstimatedReviewSeconds: itemEstimateMap[t.ItemID],
 		})
 	}
 

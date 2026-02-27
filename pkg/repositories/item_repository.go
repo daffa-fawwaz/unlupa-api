@@ -71,7 +71,7 @@ func (r *ItemRepository) FindGraduateItemsByJuzDay(ownerID uuid.UUID, dayOfMonth
 	err := r.db.
 		Joins("JOIN juz_items ON juz_items.item_id = items.id").
 		Joins("JOIN juzs ON juzs.id = juz_items.juz_id").
-		Where("items.owner_id = ? AND items.status = ? AND juzs.index = ?", 
+		Where("items.owner_id = ? AND items.status = ? AND juzs.index = ?",
 			ownerID, entities.ItemStatusGraduate, dayOfMonth).
 		Find(&items).Error
 	return items, err
@@ -99,10 +99,33 @@ func (r *ItemRepository) FindByIDs(ids []uuid.UUID) ([]entities.Item, error) {
 }
 
 // FindByOwnerAndSourceType finds items by owner and source_type
+// FindEligibleForGraduation finds items in fsrs_active that have been there for >= thresholdDays
+func (r *ItemRepository) FindEligibleForGraduation(ownerID uuid.UUID, thresholdDays int, now time.Time) ([]entities.Item, error) {
+	cutoff := now.AddDate(0, 0, -thresholdDays)
+	var items []entities.Item
+	// Use fsrs_start_at as the start of fsrs_active phase (day 1).
+	// Fallback to interval_end_at for backward compatibility if fsrs_start_at is NULL.
+	err := r.db.
+		Where("owner_id = ? AND status = ? AND source_type = 'quran'", ownerID, entities.ItemStatusFSRSActive).
+		Where("(fsrs_start_at IS NOT NULL AND fsrs_start_at <= ?) OR (fsrs_start_at IS NULL AND interval_end_at IS NOT NULL AND interval_end_at <= ?)", cutoff, cutoff).
+		Find(&items).Error
+	return items, err
+}
+
 func (r *ItemRepository) FindByOwnerAndSourceType(ownerID uuid.UUID, sourceType string) ([]entities.Item, error) {
 	var items []entities.Item
 	err := r.db.Where("owner_id = ? AND source_type = ?", ownerID, sourceType).
 		Order("created_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
+// FindEligibleForGraduationByStability finds fsrs_active Quran items with stability >= threshold
+func (r *ItemRepository) FindEligibleForGraduationByStability(ownerID uuid.UUID, stabilityThreshold float64) ([]entities.Item, error) {
+	var items []entities.Item
+	err := r.db.
+		Where("owner_id = ? AND status = ? AND source_type = 'quran' AND stability >= ?",
+			ownerID, entities.ItemStatusFSRSActive, stabilityThreshold).
 		Find(&items).Error
 	return items, err
 }

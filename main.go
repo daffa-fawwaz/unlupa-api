@@ -64,6 +64,9 @@ func main() {
 	teacherReqRepo := repositories.NewTeacherRequestRepository(config.DB)
 	reviewStateRepo := repositories.NewReviewStateRepository(config.DB)
 	fsrsWeightsRepo := repositories.NewFSRSWeightsRepository(config.DB)
+	classRepo := repositories.NewClassRepository(config.DB)
+	classMemberRepo := repositories.NewClassMemberRepository(config.DB)
+	juzRepo := repositories.NewJuzRepository(config.DB)
 
 	// ================= AUTH =================
 	authSvc := services.NewAuthService()
@@ -88,10 +91,13 @@ func main() {
 	juzItemRepo := repositories.NewJuzItemRepository(config.DB)
 	dailyTaskRepo := repositories.NewDailyTaskRepository(config.DB)
 	dailyTaskSvc := services.NewDailyTaskService(
-	reviewStateRepo,
-	dailyTaskRepo,
-	itemRepoForDaily,
-)
+		reviewStateRepo,
+		dailyTaskRepo,
+		itemRepoForDaily,
+		classMemberRepo,
+		classRepo,
+		juzRepo,
+	)
     dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo, appCache)
 
 
@@ -110,7 +116,6 @@ quranValidator, err := services.NewQuranValidator("data/surah.json")
 if err != nil {
 	log.Fatalf("Failed to initialize QuranValidator: %v", err)
 }
-juzRepo := repositories.NewJuzRepository(config.DB)
 itemRepo := repositories.NewItemRepository(config.DB)
 hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
 juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo, appCache)
@@ -129,8 +134,6 @@ bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemR
 bookHandler := handlers.NewBookHandler(bookSvc, appCache)
 
 // ================= CLASS =================
-classRepo := repositories.NewClassRepository(config.DB)
-classMemberRepo := repositories.NewClassMemberRepository(config.DB)
 classBookRepo := repositories.NewClassBookRepository(config.DB)
 classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo)
 classHandler := handlers.NewClassHandler(classSvc)
@@ -170,4 +173,3 @@ routes.SetupRoutes(
 	log.Printf("🚀 Server running on port %s...\n", port)
 	log.Fatal(app.Listen(fmt.Sprintf(":%s", port)))
 }
-

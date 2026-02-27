@@ -58,6 +58,76 @@ func (h *JuzHandler) invalidateJuzCache(c *fiber.Ctx, userID uuid.UUID) {
 	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
 }
 
+// Activate godoc
+// @Summary Aktifkan juz
+// @Description Mengaktifkan juz tertentu agar masuk antrian review graduate
+// @Tags Juz
+// @Produce json
+// @Security BearerAuth
+// @Param index path int true "Juz index (1-30)"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /juz/{index}/activate [post]
+func (h *JuzHandler) Activate(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	juzIndex, err := strconv.Atoi(c.Params("index"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid juz index parameter", "INVALID_PARAMETER", nil)
+	}
+
+	j, err := h.juzRepo.FindByUserAndIndex(userID.String(), juzIndex)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, "Juz not found for user", "JUZ_NOT_FOUND", nil)
+	}
+
+	j.IsActive = true
+	if err := h.juzRepo.Update(j); err != nil {
+		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "UPDATE_JUZ_FAILED", nil)
+	}
+
+	h.invalidateJuzCache(c, userID)
+	// Invalidate today's daily cache so next generate/list reflects change
+	date := time.Now().Format("2006-01-02")
+	h.cache.Delete(c.Context(), fmt.Sprintf("daily:%s:%s", userID.String(), date))
+	return utils.Success(c, fiber.StatusOK, "Juz activated", map[string]any{"index": juzIndex, "active": true}, nil)
+}
+
+// Deactivate godoc
+// @Summary Nonaktifkan juz
+// @Description Menonaktifkan juz tertentu agar dilewati dalam antrian review graduate
+// @Tags Juz
+// @Produce json
+// @Security BearerAuth
+// @Param index path int true "Juz index (1-30)"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /juz/{index}/deactivate [post]
+func (h *JuzHandler) Deactivate(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	juzIndex, err := strconv.Atoi(c.Params("index"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid juz index parameter", "INVALID_PARAMETER", nil)
+	}
+
+	j, err := h.juzRepo.FindByUserAndIndex(userID.String(), juzIndex)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, "Juz not found for user", "JUZ_NOT_FOUND", nil)
+	}
+
+	j.IsActive = false
+	if err := h.juzRepo.Update(j); err != nil {
+		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "UPDATE_JUZ_FAILED", nil)
+	}
+
+	h.invalidateJuzCache(c, userID)
+	// Invalidate today's daily cache so next generate/list reflects change
+	date := time.Now().Format("2006-01-02")
+	h.cache.Delete(c.Context(), fmt.Sprintf("daily:%s:%s", userID.String(), date))
+	return utils.Success(c, fiber.StatusOK, "Juz deactivated", map[string]any{"index": juzIndex, "active": false}, nil)
+}
+
 // JuzWithStatusCount response struct
 type JuzWithStatusCount struct {
 	JuzID      uuid.UUID `json:"juz_id"`
@@ -160,4 +230,3 @@ func (h *JuzHandler) GetMyJuz(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusOK, "juz fetched successfully", resp, nil)
 }
-
