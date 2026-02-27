@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
+
 	"hifzhun-api/pkg/entities"
+	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/usecases"
 	"hifzhun-api/pkg/utils"
 
@@ -16,17 +19,22 @@ func NewAuthHandler(authUC usecases.AuthUsecase) *AuthHandler {
 	return &AuthHandler{authUC}
 }
 
-// ================= REGISTER =================
-// POST /register
+// Register godoc
+// @Summary Register new user
+// @Description Register a new user account as student
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "Register request"
+// @Success 201 {object} utils.SuccessResponse{data=RegisterResponse}
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req struct {
-		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
-		Role     string `json:"role"`
 		FullName string `json:"full_name"`
-		School   string `json:"school"`
-		Domicile string `json:"domicile"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -39,46 +47,79 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		)
 	}
 
-	user := &entities.User{
-		Username: req.Username,
-		Email:    req.Email,
-		Password: req.Password,
-		Role:     req.Role,
-		FullName: req.FullName,
-		School:   req.School,
-		Domicile: req.Domicile,
-	}
-
-	if err := h.authUC.Register(user); err != nil {
+	if req.Email == "" || req.Password == "" || req.FullName == "" {
 		return utils.Error(
 			c,
 			fiber.StatusBadRequest,
-			err.Error(),
+			"validation error",
+			"VALIDATION_ERROR",
+			[]utils.FieldError{
+				{Field: "email", Messages: []string{"email is required"}},
+				{Field: "password", Messages: []string{"password is required"}},
+				{Field: "full_name", Messages: []string{"full name is required"}},
+			},
+		)
+	}
+
+	user := &entities.User{
+		Email:    req.Email,
+		Password: req.Password,
+		FullName: req.FullName,
+		Role:     "student",
+		IsActive: true,
+	}
+
+	err := h.authUC.Register(user)
+	if err != nil {
+
+		if errors.Is(err, repositories.ErrEmailAlreadyExists) {
+			return utils.Error(
+				c,
+				fiber.StatusBadRequest,
+				"email already registered",
+				"EMAIL_ALREADY_EXISTS",
+				[]utils.FieldError{
+					{
+						Field:    "email",
+						Messages: []string{"email already exists"},
+					},
+				},
+			)
+		}
+
+		return utils.Error(
+			c,
+			fiber.StatusInternalServerError,
+			"failed to register user",
 			"REGISTER_FAILED",
 			nil,
 		)
 	}
 
-	message := "registration success"
-	if user.Role == "teacher" {
-		message = "registration success, waiting admin approval"
-	}
-
 	return utils.Success(
 		c,
 		fiber.StatusCreated,
-		message,
+		"registration success",
 		fiber.Map{
-			"id":    user.ID,
-			"email": user.Email,
-			"role":  user.Role,
+			"id":        user.ID,
+			"email":     user.Email,
+			"full_name": user.FullName,
+			"role":      user.Role,
 		},
 		nil,
 	)
 }
 
-// ================= LOGIN =================
-// POST /login
+// Login godoc
+// @Summary Login user
+// @Description Authenticate user and return JWT token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login request"
+// @Success 200 {object} utils.SuccessResponse{data=LoginResponse}
+// @Failure 401 {object} utils.ErrorResponse
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
@@ -113,6 +154,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		fiber.Map{
 			"id":    user.ID,
 			"email": user.Email,
+			"name":  user.FullName,
 			"role":  user.Role,
 			"token": token,
 		},
@@ -120,35 +162,34 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	)
 }
 
-// ================= ADMIN APPROVE TEACHER =================
-// PUT /admin/approve/:id
-func (h *AuthHandler) ApproveTeacher(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if id == "" {
-		return utils.Error(
-			c,
-			fiber.StatusBadRequest,
-			"id is required",
-			"BAD_REQUEST",
-			nil,
-		)
-	}
+// ==================== REQUEST/RESPONSE MODELS ====================
 
-	if err := h.authUC.ApproveTeacher(id); err != nil {
-		return utils.Error(
-			c,
-			fiber.StatusBadRequest,
-			err.Error(),
-			"APPROVE_FAILED",
-			nil,
-		)
-	}
+// RegisterRequest represents register request body
+type RegisterRequest struct {
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"password123"`
+	FullName string `json:"full_name" example:"John Doe"`
+}
 
-	return utils.Success(
-		c,
-		fiber.StatusOK,
-		"teacher approved successfully",
-		nil,
-		nil,
-	)
+// RegisterResponse represents register response data
+type RegisterResponse struct {
+	ID       string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Email    string `json:"email" example:"user@example.com"`
+	FullName string `json:"full_name" example:"John Doe"`
+	Role     string `json:"role" example:"student"`
+}
+
+// LoginRequest represents login request body
+type LoginRequest struct {
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"password123"`
+}
+
+// LoginResponse represents login response data
+type LoginResponse struct {
+	ID    string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Email string `json:"email" example:"user@example.com"`
+	Name  string `json:"name" example:"John Doe"`
+	Role  string `json:"role" example:"student"`
+	Token string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }

@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"errors"
-	"fmt"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
@@ -11,7 +10,6 @@ import (
 type AuthUsecase interface {
 	Register(user *entities.User) error
 	Login(email, password string) (*entities.User, string, error)
-	ApproveTeacher(id string) error
 }
 
 type authUsecase struct {
@@ -33,16 +31,6 @@ func (u *authUsecase) Register(user *entities.User) error {
 	}
 	user.Password = hashed
 
-	// aturan role
-	switch user.Role {
-	case "student":
-		user.IsActive = true
-	case "teacher":
-		user.IsActive = false // harus di-ACC admin
-	default:
-		return errors.New("invalid role")
-	}
-
 	return u.userRepo.Create(user)
 }
 
@@ -56,12 +44,7 @@ func (u *authUsecase) Login(email, password string) (*entities.User, string, err
 		return nil, "", errors.New("account not active, waiting admin approval")
 	}
 
-	// DEBUG: hapus setelah fix
-	fmt.Printf("DEBUG - Hash from DB: %s\n", user.Password)
-	fmt.Printf("DEBUG - Password input: %s\n", password)
-
 	if err := u.authSvc.CheckPassword(user.Password, password); err != nil {
-		fmt.Printf("DEBUG - bcrypt error: %v\n", err)
 		return nil, "", errors.New("wrong password")
 	}
 
@@ -73,6 +56,3 @@ func (u *authUsecase) Login(email, password string) (*entities.User, string, err
 	return user, token, nil
 }
 
-func (u *authUsecase) ApproveTeacher(id string) error {
-	return u.userRepo.ApproveTeacher(id)
-}

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BAQEN - Ruang Al-Qur'an</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Cinzel:wght@400;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { background-color: #000000; color: white; font-family: 'Inter', sans-serif; overflow-x: hidden; margin: 0; padding: 0; }
+        
+        /* --- BACKGROUND --- */
+        .bg-deep-universe {
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 20% 80%, rgba(180, 83, 9, 0.1) 0%, transparent 60%),
+                linear-gradient(180deg, #020617 0%, #000000 100%);
+            min-height: 100vh;
+        }
+        .stars-overlay { position: fixed; inset: 0; background-image: radial-gradient(white, rgba(255,255,255,.1) 1px, transparent 2px); background-size: 550px 550px; opacity: 0.15; pointer-events: none; z-index: 0; }
+
+        /* --- NAVIGATION --- */
+        .view-section { display: none; opacity: 0; transition: opacity 0.5s ease; position: relative; z-index: 10; }
+        .view-section.active { display: block; opacity: 1; animation: fadeIn 0.5s forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- DASHBOARD COMPONENTS --- */
+        .juz-progress-container {
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; padding: 24px; position: relative; overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .progress-track { width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; margin-top: 16px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #fbbf24, #d97706); border-radius: 3px; box-shadow: 0 0 15px rgba(251, 191, 36, 0.4); width: 0%; transition: width 1s ease; }
+
+        .action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 40px; }
+        .action-card {
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px; padding: 20px; cursor: pointer; transition: all 0.3s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+        }
+        .action-card:hover { background: rgba(245, 158, 11, 0.08); border-color: #fbbf24; transform: translateY(-2px); }
+
+        /* JUZ CARD */
+        .juz-card {
+            background: linear-gradient(145deg, rgba(20, 15, 10, 0.9) 0%, rgba(10, 10, 10, 0.7) 100%);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            border-radius: 16px; padding: 24px; position: relative; overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
+            display: flex; flex-direction: column; min-height: 220px;
+        }
+        .juz-card:hover { transform: translateY(-4px); border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.8); }
+        .juz-number { font-family: 'Cinzel', serif; font-size: 5rem; color: rgba(255, 255, 255, 0.03); position: absolute; top: -15px; right: 10px; font-weight: 700; pointer-events: none; }
+        
+        .lifecycle-grid { 
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; 
+            border-top: 1px dashed rgba(255,255,255,0.1); margin-top: auto; padding-top: 16px;
+        }
+        .lf-item { display: flex; flex-direction: column; align-items: center; }
+        .lf-val { font-family: 'JetBrains Mono'; font-weight: bold; font-size: 1rem; color: white; }
+        .lf-lbl { font-size: 0.5rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; text-align: center; }
+        
+        .text-gold { color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.3); } 
+        .text-blue { color: #60a5fa; } .text-orange { color: #fb923c; } 
+        .text-red { color: #f87171; } .text-emerald { color: #34d399; } .text-purple { color: #c084fc; }
+
+        /* ITEM LIST */
+        .quran-item-row {
+            background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px; padding: 20px; margin-bottom: 12px;
+            display: flex; flex-direction: column; gap: 16px; transition: all 0.3s;
+        }
+        .quran-item-row:hover { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.15); }
+        
+        .st-badge { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: bold; display: inline-block; }
+        .st-new { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .st-memo { background: rgba(249, 115, 22, 0.1); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
+        .st-consol { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .st-active { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .st-maint { background: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+        .st-grad { background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+        .item-meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.75rem; color: #9ca3af; }
+        .item-meta-val { color: #e5e7eb; font-family: 'JetBrains Mono'; font-weight: bold; margin-left: 4px; }
+
+        /* MONITOR BOXES */
+        .monitor-box {
+            background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin-top: 4px;
+            border-left: 3px solid #555; display: flex; justify-content: space-between; align-items: center;
+        }
+        .monitor-box.consol { border-color: #f87171; background: rgba(239, 68, 68, 0.05); }
+        .monitor-box.active { border-color: #fbbf24; background: rgba(245, 158, 11, 0.05); }
+        .monitor-box.maint { border-color: #34d399; background: rgba(16, 185, 129, 0.05); }
+
+        .mon-label { font-size: 0.6rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px; }
+        .mon-val { font-family: 'JetBrains Mono'; font-weight: bold; font-size: 0.9rem; color: white; margin-top: 2px; }
+        .mon-sub { font-size: 0.65rem; color: #6b7280; display: block; margin-top: 2px; }
+        .mon-col { display: flex; flex-direction: column; }
+        .mon-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 12px; }
+
+        /* Buttons */
+        .btn-jump { 
+            background: transparent; border: 1px dashed rgba(255,255,255,0.15); color: #6b7280; 
+            font-size: 0.6rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; transition: 0.2s;
+        }
+        .btn-jump:hover { border-color: #fbbf24; color: #fbbf24; background: rgba(245, 158, 11, 0.05); }
+        
+        /* DELETE BUTTON */
+        .btn-delete {
+            color: #6b7280; background: transparent; border: none; cursor: pointer; transition: all 0.2s;
+            padding: 4px; border-radius: 4px;
+        }
+        .btn-delete:hover { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+
+        /* CREATE FORM */
+        .create-container { width: 100%; max-width: 550px; background: rgba(10, 12, 15, 0.95); border: 1px solid rgba(245, 158, 11, 0.3); backdrop-filter: blur(30px); border-radius: 24px; padding: 40px; margin: 0 auto; box-shadow: 0 40px 80px -20px rgba(0,0,0,0.9); }
+        .step-container { display: none; }
+        .step-container.active { display: block; animation: fadeIn 0.5s ease; }
+        .input-select { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 14px; border-radius: 12px; font-family: 'Inter', sans-serif; cursor: pointer; appearance: none; display: block; transition: border-color 0.2s; }
+        .input-select:focus { border-color: #fbbf24; outline: none; background: rgba(245, 158, 11, 0.05); }
+        .form-label { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; display: block; }
+        
+        /* SLIDERS */
+        .range-slider-container { position: relative; width: 100%; height: 50px; margin-top: 10px; margin-bottom: 20px; padding: 0 10px; }
+        .slider-track { position: absolute; top: 50%; left: 10px; right: 10px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; transform: translateY(-50%); }
+        .slider-range { position: absolute; top: 50%; height: 4px; background: #fbbf24; border-radius: 2px; transform: translateY(-50%); pointer-events: none; z-index: 2; box-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
+        .range-input { position: absolute; top: 50%; width: calc(100% - 20px); left: 10px; pointer-events: none; -webkit-appearance: none; background: none; transform: translateY(-50%); z-index: 3; margin: 0; }
+        .range-input::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 20px; height: 20px; background: #000; border: 2px solid #fbbf24; border-radius: 50%; cursor: pointer; margin-top: -10px; z-index: 10; box-shadow: 0 0 5px rgba(251, 191, 36, 0.5); }
+        .val-display { display: flex; justify-content: space-between; font-family: 'JetBrains Mono'; font-size: 0.8rem; color: white; margin-bottom: 5px; }
+        .val-highlight { color: #fbbf24; font-weight: bold; font-size: 1.1rem; }
+
+        .btn-primary { width: 100%; padding: 16px; background: linear-gradient(135deg, #fbbf24 0%, #b45309 100%); color: #000; font-weight: 700; text-transform: uppercase; border-radius: 12px; margin-top: 24px; cursor: pointer; border: none; transition: transform 0.2s; letter-spacing: 0.05em; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(245, 158, 11, 0.2); }
+        .btn-ghost { background: transparent; color: #9ca3af; font-size: 0.75rem; padding: 10px; cursor: pointer; width: 100%; margin-top: 10px; border: none; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn-ghost:hover { color: white; }
+        
+        /* TOAST NOTIFICATION */
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #10b981; color: black; padding: 12px 24px; border-radius: 50px; font-family: 'JetBrains Mono'; font-weight: bold; font-size: 0.8rem; box-shadow: 0 10px 30px rgba(16,185,129,0.3); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100; opacity: 0; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* Typography */
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .font-cinzel { font-family: 'Cinzel', serif; }
+    </style>
+</head>
+<body class="bg-deep-universe">
+    <div class="stars-overlay"></div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast">Data Berhasil Disimpan</div>
+
+    <!-- ================= VIEW 1: DASHBOARD ================= -->
+    <section id="viewDashboard" class="view-section active max-w-6xl mx-auto px-6 py-12 relative z-10">
+        
+        <header class="flex justify-between items-end mb-12 fade-in-up">
+            <div>
+                <button onclick="window.location.href='dashboard.html'" class="flex items-center gap-2 text-gray-500 hover:text-white transition mb-4">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span class="text-xs font-mono uppercase tracking-widest">Dashboard Utama</span>
+                </button>
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400"><i data-lucide="moon" class="w-6 h-6"></i></div>
+                    <h1 class="font-serif text-3xl md:text-4xl text-white">Ruang Al-Qur'an</h1>
+                </div>
+            </div>
+            <div class="text-right hidden md:block">
+                <p class="text-gray-400 text-sm">Total Hafalan</p>
+                <p class="text-2xl font-serif text-white" id="totalJuzCount">0 <span class="text-sm text-gray-500 font-sans">Juz Aktif</span></p>
+            </div>
+        </header>
+
+        <!-- PROGRESS BAR -->
+        <div class="juz-progress-container fade-in-up delay-100">
+            <div class="flex justify-between items-end mb-2">
+                <div><h3 class="text-lg font-serif text-white">Progres 30 Juz</h3><p class="text-xs text-gray-400">Dihitung dari halaman terjaga (Terjaga & Selesai).</p></div>
+                <div class="text-right"><span class="text-2xl font-bold text-amber-400 font-mono" id="progressText">0 / 30 Juz</span></div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="progressBar" style="width: 0%"></div></div>
+        </div>
+
+        <!-- ACTION GRID -->
+        <div class="action-grid fade-in-up delay-200">
+            <div class="action-card" onclick="switchView('create')">
+                <i data-lucide="plus-circle" class="text-amber-500 w-8 h-8 mb-4"></i>
+                <h3 class="font-serif text-lg text-white mb-1">Tambah Hafalan</h3>
+                <p class="text-xs text-gray-400 font-light">Mulai Juz atau Surah baru</p>
+            </div>
+            <div class="action-card" onclick="alert('Fitur Gabung Kelas...')">
+                <i data-lucide="users" class="text-blue-400 w-8 h-8 mb-4"></i>
+                <h3 class="font-serif text-lg text-white mb-1">Gabung Kelas</h3>
+                <p class="text-xs text-gray-400 font-light">Setoran ke Guru / Ustadz</p>
+            </div>
+        </div>
+
+        <!-- JUZ GRID -->
+        <div class="fade-in-up delay-300">
+            <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
+                <h2 class="font-cinzel text-sm text-gray-400 uppercase tracking-widest">Mushaf Hafalan</h2>
+            </div>
+            <div id="juzContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+            <div id="emptyState" class="hidden p-8 border border-dashed border-white/10 rounded-xl text-center text-gray-500 text-sm">
+                Belum ada hafalan. Tekan "Tambah Hafalan".
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= VIEW 2: CREATE ITEM ================= -->
+    <section id="viewCreate" class="view-section relative z-20 py-12 px-4">
+        <div class="create-container">
+            <div class="flex justify-between items-center mb-8 border-b border-white/5 pb-4">
+                <h1 class="font-serif text-xl text-white">Hafalan Baru</h1>
+                <button onclick="switchView('dashboard')" class="text-gray-500 hover:text-white transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+
+            <!-- STEP 1 -->
+            <div id="step-1" class="step-container active">
+                <div class="mb-4">
+                    <label class="form-label">1. Pilih Juz</label>
+                    <select id="inputJuz" class="input-select mb-2" onchange="handleJuzChange()">
+                        <option value="">-- Pilih Juz --</option>
+                    </select>
+                </div>
+                <div class="mb-8">
+                    <label class="form-label">2. Pilih Surah</label>
+                    <select id="inputSurah" class="input-select" disabled onchange="activateSliders()">
+                        <option value="">-- Pilih Juz Dulu --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- STEP 2: Sliders (Auto Reveal) -->
+            <div id="sliderSection" class="hidden opacity-0 transition-opacity duration-500">
+                <div class="mb-6">
+                    <div class="val-display"><span>Rentang Ayat</span> <span><span id="txtAyatStart" class="val-highlight">1</span> s.d <span id="txtAyatEnd" class="val-highlight">5</span></span></div>
+                    <div class="range-slider-container">
+                        <div class="slider-track"></div><div class="slider-range" id="ayatRangeBar"></div>
+                        <input type="range" class="range-input" id="rAyat1" oninput="updateAyat()">
+                        <input type="range" class="range-input" id="rAyat2" oninput="updateAyat()">
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <div class="val-display"><span>Rentang Halaman</span> <span><span id="txtPageStart" class="val-highlight">...</span> s.d <span id="txtPageEnd" class="val-highlight">...</span></span></div>
+                    <div class="range-slider-container">
+                        <div class="slider-track"></div><div class="slider-range" id="pageRangeBar"></div>
+                        <input type="range" class="range-input" id="rPage1" oninput="updatePage()">
+                        <input type="range" class="range-input" id="rPage2" oninput="updatePage()">
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <div class="val-display"><span>Estimasi Review</span> <span id="txtTime" class="val-highlight">5 Menit</span></div>
+                    <div class="range-slider-container">
+                        <div class="slider-track"></div><div class="slider-range" id="timeRangeBar" style="width: 8%"></div>
+                        <input type="range" class="range-input" id="rTime" min="1" max="60" value="5" oninput="updateTime()">
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="saveQuranItem()">Simpan Hafalan</button>
+            </div>
+            
+        </div>
+    </section>
+
+    <!-- ================= VIEW 3: DETAIL JUZ ================= -->
+    <section id="viewJuzDetail" class="view-section max-w-4xl mx-auto px-6 py-12">
+        <header class="flex justify-between items-end mb-8 border-b border-white/5 pb-4">
+            <div>
+                <button onclick="switchView('dashboard')" class="flex items-center gap-2 text-gray-500 hover:text-white mb-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Kembali</button>
+                <h1 class="font-serif text-3xl text-white" id="juzDetailTitle">Juz ...</h1>
+            </div>
+        </header>
+        <div id="itemContainer" class="space-y-4"></div>
+    </section>
+
+    <script>
+        lucide.createIcons();
+
+        // --- ENUM STATUS (LOCKED) ---
+        const ITEM_STATUS = {
+            NEW: 'new', MEMORIZING: 'memorizing', CONSOLIDATION: 'consolidation',
+            ACTIVE: 'active', MAINTENANCE: 'maintenance', GRADUATED: 'graduated'
+        };
+
+        // --- DATABASE V18 (STRONG TYPING) ---
+        const DB_VERSION = 18;
+        let db;
+        try {
+            db = JSON.parse(localStorage.getItem('baqen_quran_final_v18'));
+            if (!db || db.version !== DB_VERSION) db = { version: DB_VERSION, items: [], materials: {} };
+        } catch (e) { db = { version: DB_VERSION, items: [], materials: {} }; }
+        
+        // HELPER
+        function nowTs() { return Date.now(); }
+        function daysFromNow(d) { return nowTs() + (d * 24 * 60 * 60 * 1000); }
+        function generateSystemId() { return 'itm_' + crypto.randomUUID(); }
+        
+        // --- DATA JUZ & SURAH (STRING KEYS) ---
+        const surahMap = {
+            "1": [{n:"Al-Fatihah",a:7},{n:"Al-Baqarah (1-141)",a:141}],
+            "2": [{n:"Al-Baqarah (142-252)",a:252}],
+            "3": [{n:"Al-Baqarah (253-286)",a:286},{n:"Ali 'Imran (1-92)",a:92}],
+            "4": [{n:"Ali 'Imran (93-200)",a:200},{n:"An-Nisa' (1-23)",a:23}],
+            "5": [{n:"An-Nisa' (24-147)",a:147}],
+            "6": [{n:"An-Nisa' (148-176)",a:176},{n:"Al-Ma'idah (1-81)",a:81}],
+            "7": [{n:"Al-Ma'idah (82-120)",a:120},{n:"Al-An'am (1-110)",a:110}],
+            "8": [{n:"Al-An'am (111-165)",a:165},{n:"Al-A'raf (1-87)",a:87}],
+            "9": [{n:"Al-A'raf (88-206)",a:206},{n:"Al-Anfal (1-40)",a:40}],
+            "10": [{n:"Al-Anfal (41-75)",a:75},{n:"At-Taubah (1-92)",a:92}],
+            "11": [{n:"At-Taubah (93-129)",a:129},{n:"Yunus",a:109},{n:"Hud (1-5)",a:5}],
+            "12": [{n:"Hud (6-123)",a:123},{n:"Yusuf (1-52)",a:52}],
+            "13": [{n:"Yusuf (53-111)",a:111},{n:"Ar-Ra'd",a:43},{n:"Ibrahim (1-52)",a:52}],
+            "14": [{n:"Al-Hijr",a:99},{n:"An-Nahl (1-128)",a:128}],
+            "15": [{n:"Al-Isra'",a:111},{n:"Al-Kahfi (1-74)",a:74}],
+            "16": [{n:"Al-Kahfi (75-110)",a:110},{n:"Maryam",a:98},{n:"Taha",a:135}],
+            "17": [{n:"Al-Anbiya'",a:112},{n:"Al-Hajj",a:78}],
+            "18": [{n:"Al-Mu'minun",a:118},{n:"An-Nur",a:64},{n:"Al-Furqan (1-20)",a:20}],
+            "19": [{n:"Al-Furqan (21-77)",a:77},{n:"Asy-Syu'ara'",a:227},{n:"An-Naml (1-55)",a:55}],
+            "20": [{n:"An-Naml (56-93)",a:93},{n:"Al-Qasas",a:88},{n:"Al-Ankabut (1-45)",a:45}],
+            "21": [{n:"Al-Ankabut (46-69)",a:69},{n:"Ar-Rum",a:60},{n:"Luqman",a:34},{n:"As-Sajdah",a:30},{n:"Al-Ahzab (1-30)",a:30}],
+            "22": [{n:"Al-Ahzab (31-73)",a:73},{n:"Saba'",a:54},{n:"Fatir",a:45},{n:"Yasin (1-27)",a:27}],
+            "23": [{n:"Yasin (28-83)",a:83},{n:"As-Saffat",a:182},{n:"Sad",a:88},{n:"Az-Zumar (1-31)",a:31}],
+            "24": [{n:"Az-Zumar (32-75)",a:75},{n:"Ghafir",a:85},{n:"Fussilat (1-46)",a:46}],
+            "25": [{n:"Fussilat (47-54)",a:54},{n:"Asy-Syura",a:53},{n:"Az-Zukhruf",a:89},{n:"Ad-Dukhan",a:59},{n:"Al-Jasiyah",a:37}],
+            "26": [{n:"Al-Ahqaf",a:35},{n:"Muhammad",a:38},{n:"Al-Fath",a:29},{n:"Al-Hujurat",a:18},{n:"Qaf",a:45},{n:"Az-Zariyat (1-30)",a:30}],
+            "27": [{n:"Az-Zariyat (31-60)",a:60},{n:"At-Tur",a:49},{n:"An-Najm",a:62},{n:"Al-Qamar",a:55},{n:"Ar-Rahman",a:78},{n:"Al-Waqi'ah",a:96},{n:"Al-Hadid",a:29}],
+            "28": [{n:"Al-Mujadilah",a:22},{n:"Al-Hasyr",a:24},{n:"Al-Mumtahanah",a:13},{n:"As-Saff",a:14},{n:"Al-Jumu'ah",a:11},{n:"Al-Munafiqun",a:11},{n:"At-Taghabun",a:18},{n:"At-Talaq",a:12},{n:"At-Tahrim",a:12}],
+            "29": [{n:"Al-Mulk",a:30},{n:"Al-Qalam",a:52},{n:"Al-Haqqah",a:52},{n:"Al-Ma'arij",a:44},{n:"Nuh",a:28},{n:"Al-Jinn",a:28},{n:"Al-Muzzammil",a:20},{n:"Al-Muddassir",a:56},{n:"Al-Qiyamah",a:40},{n:"Al-Insan",a:31},{n:"Al-Mursalat",a:50}],
+            "30": [{n:"An-Naba",a:40},{n:"An-Nazi'at",a:46},{n:"Abasa",a:42},{n:"At-Takwir",a:29},{n:"Al-Infitar",a:19},{n:"Al-Mutaffifin",a:36},{n:"Al-Insyiqaq",a:25},{n:"Al-Buruj",a:22},{n:"At-Tariq",a:17},{n:"Al-A'la",a:19},{n:"Al-Ghasyiyah",a:26},{n:"Al-Fajr",a:30},{n:"Al-Balad",a:20},{n:"Asy-Syams",a:15},{n:"Al-Lail",a:21},{n:"Ad-Duha",a:11},{n:"Al-Insyirah",a:8},{n:"At-Tin",a:8},{n:"Al-'Alaq",a:19},{n:"Al-Qadr",a:5},{n:"Al-Bayyinah",a:8},{n:"Az-Zalzalah",a:8},{n:"Al-'Adiyat",a:11},{n:"Al-Qari'ah",a:11},{n:"At-Takatsur",a:8},{n:"Al-'Asr",a:3},{n:"Al-Humazah",a:9},{n:"Al-Fil",a:5},{n:"Quraisy",a:4},{n:"Al-Ma'un",a:7},{n:"Al-Kautsar",a:3},{n:"Al-Kafirun",a:6},{n:"An-Nasr",a:3},{n:"Al-Lahab",a:5},{n:"Al-Ikhlas",a:4},{n:"Al-Falaq",a:5},{n:"An-Nas",a:6}]
+        };
+
+        const pageDB = {};
+        for (let i=1; i<=30; i++) {
+             pageDB[i.toString()] = { min: ((i-1)*20)+2, max: (i*20)+1 };
+        }
+        pageDB["1"] = {min:1, max:21}; pageDB["30"] = {min:582, max:604};
+
+        let draft = {}; let currentJuz = ""; let maxA = 286; let minP = 1, maxP = 21;
+
+        // Init
+        function populateJuzSelect() {
+            const sel = document.getElementById('inputJuz');
+            sel.innerHTML = '<option value="">-- Pilih Juz --</option>';
+            for(let i=30; i>=1; i--) sel.add(new Option(`Juz ${i}`, i.toString()));
+        }
+        populateJuzSelect();
+
+        // --- NAVIGATION ---
+        function switchView(view, id=null) {
+            document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active'));
+            if(view === 'dashboard') { document.getElementById('viewDashboard').classList.add('active'); renderDashboard(); }
+            else if(view === 'create') { document.getElementById('viewCreate').classList.add('active'); resetForm(); }
+            else if(view === 'juz_detail') { document.getElementById('viewJuzDetail').classList.add('active'); renderJuzDetail(id); }
+        }
+
+        // --- CREATE LOGIC ---
+        function handleJuzChange() {
+            currentJuz = document.getElementById('inputJuz').value; // String
+            const sel = document.getElementById('inputSurah');
+            sel.innerHTML = '<option value="">-- Pilih Surah --</option>';
+            
+            // Checking against String Keys
+            if(currentJuz && surahMap[currentJuz]) {
+                sel.disabled = false;
+                surahMap[currentJuz].forEach((s, i) => {
+                    let opt = new Option(s.n, i); 
+                    sel.add(opt);
+                });
+            } else { sel.disabled = true; }
+            document.getElementById('sliderSection').classList.add('hidden');
+        }
+
+        function activateSliders() {
+            const idx = document.getElementById('inputSurah').value;
+            if(idx === "") return;
+
+            const data = surahMap[currentJuz][idx];
+            draft.surahName = data.n; draft.juz = currentJuz; draft.surahIdx = idx; maxA = data.a;
+
+            document.getElementById('sliderSection').classList.remove('hidden');
+            setTimeout(() => document.getElementById('sliderSection').style.opacity = '1', 10);
+
+            setDualSlider('rAyat1', 'rAyat2', 1, maxA, 1, Math.min(5, maxA)); updateAyat();
+            const p = pageDB[currentJuz]; minP = p.min; maxP = p.max;
+            setDualSlider('rPage1', 'rPage2', minP, maxP, minP, minP); updatePage();
+            updateTime();
+        }
+
+        function setDualSlider(id1, id2, min, max, v1, v2) {
+            const r1=document.getElementById(id1), r2=document.getElementById(id2);
+            r1.min=min; r1.max=max; r1.value=v1;
+            r2.min=min; r2.max=max; r2.value=v2;
+        }
+
+        function updateAyat() { updateDualVisual('rAyat1', 'rAyat2', 'ayatRangeBar', 'txtAyatStart', 'txtAyatEnd', maxA, 1, 'ayat'); }
+        function updatePage() { updateDualVisual('rPage1', 'rPage2', 'pageRangeBar', 'txtPageStart', 'txtPageEnd', maxP, minP, 'page'); }
+        function updateTime() { 
+            const val = document.getElementById('rTime').value;
+            document.getElementById('txtTime').innerText = val + " Menit";
+            document.getElementById('timeRangeBar').style.width = (val/60)*100 + "%";
+            draft.time = val;
+        }
+
+        function updateDualVisual(id1, id2, barId, txt1, txt2, max, min, type) {
+            const r1 = document.getElementById(id1); const r2 = document.getElementById(id2);
+            let v1 = parseInt(r1.value); let v2 = parseInt(r2.value);
+            const lower = Math.min(v1, v2); const upper = Math.max(v1, v2);
+            const range = max - min;
+            const left = ((lower - min) / range) * 100;
+            const width = ((upper - lower) / range) * 100;
+
+            document.getElementById(barId).style.left = left + "%";
+            document.getElementById(barId).style.width = Math.max(width, 1) + "%";
+            document.getElementById(txt1).innerText = lower;
+            document.getElementById(txt2).innerText = upper;
+
+            if(type === 'ayat') { draft.ayatStart = lower; draft.ayatEnd = upper; }
+            else { draft.pageStart = lower; draft.pageEnd = upper; }
+        }
+
+        function generateMaterialId(juz, surahName) {
+            return `QURAN_JUZ_${juz}_SURAH_${surahName.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+        }
+
+        function saveQuranItem() {
+            const materialId = generateMaterialId(draft.juz, draft.surahName);
+            if(!db.materials[materialId]) {
+                db.materials[materialId] = { id: materialId, type: 'quran', title: draft.surahName, meta: { juz: draft.juz } };
+            }
+
+            const newItem = {
+                id_system: generateSystemId(),
+                id_visual: Date.now(),
+                material_id: materialId,
+                range: { ayat: `${draft.ayatStart}-${draft.ayatEnd}`, page: `${draft.pageStart}-${draft.pageEnd}` },
+                time: { value: draft.time, unit: 'Menit' },
+                status: ITEM_STATUS.NEW,
+                
+                consolidationDays: 0,
+                activeStage: 0,
+                stageStreak: 0,
+                lastReview: null,
+                nextReview: null,
+                fingerprint: `A${draft.ayatStart}-${draft.ayatEnd}_P${draft.pageStart}-${draft.pageEnd}`
+            };
+
+            db.items.push(newItem);
+            saveDB();
+            
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+                switchView('dashboard');
+            }, 1500);
+        }
+
+        function resetForm() {
+            document.getElementById('inputJuz').value = "";
+            document.getElementById('inputSurah').disabled = true;
+            document.getElementById('inputSurah').innerHTML = "";
+            document.getElementById('sliderSection').classList.add('hidden');
+        }
+
+        // --- DASHBOARD RENDER ---
+        function renderDashboard() {
+            const container = document.getElementById('juzContainer');
+            container.innerHTML = '';
+            
+            if(db.items.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('progressBar').style.width = "0%";
+            } else {
+                document.getElementById('emptyState').classList.add('hidden');
+                
+                // Group items by Juz using Material ID lookup
+                const juzGroups = {};
+                let totalSafePages = 0;
+
+                db.items.forEach(item => {
+                    const mat = db.materials[item.material_id];
+                    if(!mat) return;
+                    const jid = mat.meta.juz;
+                    if(!juzGroups[jid]) juzGroups[jid] = { id: jid, items: [] };
+                    juzGroups[jid].items.push(item);
+
+                    if(item.status === ITEM_STATUS.MAINTENANCE || item.status === ITEM_STATUS.GRADUATED) {
+                         try {
+                             let parts = item.range.page.split('-');
+                             let start = parseInt(parts[0]);
+                             let end = parts.length > 1 ? parseInt(parts[1]) : start;
+                             let pages = (end - start) + 1;
+                             totalSafePages += pages;
+                         } catch(e) {}
+                    }
+                });
+
+                Object.values(juzGroups).forEach(juz => {
+                    let c = { new:0, memorizing:0, consolidation:0, active:0, maintenance:0, graduated:0 };
+                    juz.items.forEach(i => { if(c[i.status] !== undefined) c[i.status]++; });
+
+                    container.insertAdjacentHTML('beforeend', `
+                    <div class="juz-card group" onclick="switchView('juz_detail', '${juz.id}')">
+                        <div class="juz-number">${juz.id}</div>
+                        <div class="juz-header">
+                            <h3 class="font-serif text-2xl text-white">Juz ${juz.id}</h3>
+                            <div class="item-count-badge">${juz.items.length} Item</div>
+                        </div>
+                        <div class="lifecycle-grid">
+                            <div class="lf-item"><span class="lf-val text-blue">${c.new}</span><span class="lf-lbl">Belum</span></div>
+                            <div class="lf-item"><span class="lf-val text-orange">${c.memorizing}</span><span class="lf-lbl">Proses</span></div>
+                            <div class="lf-item"><span class="lf-val text-red">${c.consolidation}</span><span class="lf-lbl">Kuatkan</span></div>
+                            <div class="lf-item"><span class="lf-val text-gold">${c.active}</span><span class="lf-lbl">Ujian</span></div>
+                            <div class="lf-item"><span class="lf-val text-emerald">${c.maintenance}</span><span class="lf-lbl">Terjaga</span></div>
+                            <div class="lf-item"><span class="lf-val text-purple">${c.graduated}</span><span class="lf-lbl">Selesai</span></div>
+                        </div>
+                    </div>`);
+                });
+                
+                let juzMastered = (totalSafePages / 20).toFixed(1);
+                document.getElementById('totalJuzCount').innerText = juzMastered + " Juz";
+                document.getElementById('progressText').innerHTML = `${juzMastered} <span class="text-sm text-gray-500">/ 30 Juz</span>`;
+                document.getElementById('progressBar').style.width = ((totalSafePages/604)*100) + "%";
+            }
+            lucide.createIcons();
+        }
+
+        // --- LIFECYCLE LOGIC (Pure Monitor) ---
+        function renderJuzDetail(jid) {
+            document.getElementById('juzDetailTitle').innerText = "Juz " + jid;
+            const c = document.getElementById('itemContainer');
+            c.innerHTML = '';
+
+            const juzItems = db.items.filter(item => {
+                const mat = db.materials[item.material_id];
+                // Compare string to string for safety
+                return mat && mat.meta.juz.toString() === jid.toString();
+            });
+
+            juzItems.forEach(item => {
+                const mat = db.materials[item.material_id];
+                let monitorInfo='', stClass='', stText='', jumpBtn='';
+                let lastReview = item.lastReview ? new Date(item.lastReview).toLocaleDateString('id-ID', {day: 'numeric', month:'short'}) : '-';
+                let nextReview = item.nextReview ? new Date(item.nextReview).toLocaleDateString('id-ID', {day: 'numeric', month:'short'}) : '-';
+                
+                // MONITOR ONLY LOGIC
+                if(item.status === ITEM_STATUS.NEW) { 
+                    stClass='st-new'; stText='Belum Mulai'; 
+                    jumpBtn=`<button class="btn-jump" onclick="updSt('${item.id_system}', ITEM_STATUS.MEMORIZING)">Mulai Menghafal</button>`;
+                } 
+                else if(item.status === ITEM_STATUS.MEMORIZING) { 
+                    stClass='st-memo'; stText='Proses Hafal'; 
+                    jumpBtn=`<button class="btn-jump" onclick="updSt('${item.id_system}', ITEM_STATUS.CONSOLIDATION)">Sudah Hafal</button>`;
+                } 
+                else if(item.status === ITEM_STATUS.CONSOLIDATION) { 
+                    stClass='st-consol'; stText='Penguatan'; 
+                    let day = item.consolidationDays || 1;
+                    monitorInfo = `<div class="monitor-box consol">
+                        <div class="mon-col"><span class="mon-label">HARI KE-</span><span class="mon-val">${day}</span></div>
+                        <div class="mon-divider"></div>
+                        <div class="mon-col text-right"><span class="mon-label">NEXT</span><span class="mon-val text-xs">Besok</span></div>
+                    </div>`;
+                    jumpBtn=`<button class="btn-jump" onclick="updSt('${item.id_system}', ITEM_STATUS.ACTIVE)">Lompati ke Ujian</button>`;
+                } 
+                else if(item.status === ITEM_STATUS.ACTIVE) { 
+                    stClass='st-active'; stText='Ujian Ketahanan'; 
+                    let stage = item.activeStage || 1; let streak = item.stageStreak || 0;
+                    monitorInfo = `<div class="monitor-box active">
+                        <div class="mon-col"><span class="mon-label">TAHAP</span><span class="mon-val">${stage}/15</span><span class="mon-sub">Streak ${streak}/3</span></div>
+                        <div class="mon-divider"></div>
+                        <div class="mon-col text-right"><span class="mon-label">NEXT</span><span class="mon-val text-xs text-amber-400">${nextReview}</span><span class="mon-sub">Last: ${lastReview}</span></div>
+                    </div>`;
+                    jumpBtn=`<button class="btn-jump" onclick="updSt('${item.id_system}', ITEM_STATUS.MAINTENANCE)">Lompati ke Terjaga</button>`;
+                } 
+                else if(item.status === ITEM_STATUS.MAINTENANCE) { 
+                    stClass='st-maint'; stText='Terjaga'; 
+                    monitorInfo = `<div class="monitor-box maint">
+                        <div class="mon-col"><span class="mon-label">TERAKHIR</span><span class="mon-val">${lastReview}</span></div>
+                        <div class="mon-divider"></div>
+                         <div class="mon-col text-right"><span class="mon-label">JADWAL</span><span class="mon-val text-xs text-emerald-400">${nextReview}</span></div>
+                    </div>`;
+                    jumpBtn=`<button class="btn-jump" onclick="updSt('${item.id_system}', ITEM_STATUS.GRADUATED)">Luluskan</button>`;
+                } 
+                else if(item.status === ITEM_STATUS.GRADUATED) { 
+                    stClass='st-grad'; stText='Selesai'; 
+                    jumpBtn=`<button class="btn-jump" onclick="updSt('${item.id_system}', ITEM_STATUS.ACTIVE)">Aktifkan Lagi</button>`;
+                }
+
+                c.insertAdjacentHTML('beforeend', `
+                    <div class="quran-item-row">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-serif text-lg text-white">${mat.title}</h3>
+                                <div class="flex gap-2">
+                                     <span class="st-badge ${stClass}">${stText}</span>
+                                     <button class="btn-delete" onclick="deleteItem('${item.id_system}')"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                            <div class="item-meta-grid">
+                                <div>Ayat: <span class="item-meta-val">${item.range.ayat}</span></div>
+                                <div>Hal: <span class="item-meta-val">${item.range.page}</span></div>
+                                <div>Waktu: <span class="item-meta-val">${item.time.value}m</span></div>
+                            </div>
+                            ${monitorInfo}
+                        </div>
+                        <div class="text-right mt-2">${jumpBtn}</div>
+                    </div>
+                `);
+            });
+            lucide.createIcons();
+        }
+
+        function updSt(systemId, st) {
+            const idx = db.items.findIndex(i => i.id_system == systemId);
+            if(idx > -1) {
+                db.items[idx].status = st;
+                if(st === ITEM_STATUS.CONSOLIDATION) db.items[idx].consolidationDays = 1;
+                if(st === ITEM_STATUS.ACTIVE) { 
+                    db.items[idx].activeStage = 1; db.items[idx].stageStreak = 0; 
+                    let d = new Date(); d.setDate(d.getDate() + 1);
+                    db.items[idx].nextReview = d.getTime();
+                }
+                if(st === ITEM_STATUS.MAINTENANCE) {
+                    let d = new Date(); d.setDate(d.getDate() + 3); 
+                    db.items[idx].nextReview = d.getTime();
+                }
+                db.items[idx].lastReview = nowTs();
+                saveDB();
+                const mat = db.materials[db.items[idx].material_id];
+                renderJuzDetail(mat.meta.juz);
+            }
+        }
+
+        function deleteItem(systemId) {
+            if(confirm("Hapus item ini?")) {
+                const idx = db.items.findIndex(i => i.id_system == systemId);
+                const mat = db.materials[db.items[idx].material_id];
+                db.items.splice(idx, 1);
+                saveDB();
+                renderJuzDetail(mat.meta.juz);
+            }
+        }
+
+        function saveDB() { localStorage.setItem('baqen_quran_final_v16', JSON.stringify(db)); }
+        function nowTs() { return Date.now(); }
+        function daysFromNow(d) { return nowTs() + (d * 24 * 60 * 60 * 1000); }
+        function generateSystemId() { return 'itm_' + Math.random().toString(36).substr(2, 9); }
+
+        renderDashboard();
+    </script>
+</body>
+</html>

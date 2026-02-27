@@ -48,6 +48,24 @@ func ConnectDatabase() {
 		&entities.ClassMember{},
 		&entities.Card{},
 		&entities.CardState{},
+		&entities.TeacherRequest{},
+		&entities.ItemState{},
+		&entities.Item{},
+		&entities.ItemGraduation{},
+		&entities.FSRSState{},
+		&entities.DailyTask{},
+		&entities.ReviewState{},
+		&entities.ReviewLog{},
+		&entities.EngineControl{},
+		&entities.FSRSWeights{},
+		&entities.Card{},
+		&entities.Juz{},
+		&entities.JuzItem{},
+		&entities.Book{},
+		&entities.BookModule{},
+		&entities.BookItem{},
+		&entities.ClassBook{},
+		&entities.IntervalReviewLog{},
 
 	)
 	if err != nil {
@@ -55,6 +73,5 @@ func ConnectDatabase() {
 	}
 
 	log.Println("✅ Database connected and migrated successfully!")
-
 }
 
