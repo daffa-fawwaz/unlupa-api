@@ -16,6 +16,7 @@ type BookService interface {
 	GetMyBooks(ownerID uuid.UUID) ([]entities.Book, error)
 	GetPublishedBooks() ([]entities.Book, error)
 	GetBookDetail(bookID string, userID *uuid.UUID) (*entities.Book, error)
+	GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeResponse, error)
 	UpdateBook(bookID string, ownerID uuid.UUID, title, description, coverImage string) (*entities.Book, error)
 	DeleteBook(bookID string, ownerID uuid.UUID) error
 
@@ -31,7 +32,7 @@ type BookService interface {
 	DeleteModule(moduleID string, ownerID uuid.UUID) error
 
 	// Item CRUD
-	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error)
+	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error)
 	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
 
@@ -39,13 +40,30 @@ type BookService interface {
 	StartItemMemorization(userID uuid.UUID, bookID, bookItemID string) (*StartMemorizationResult, error)
 }
 
+// BookTreeResponse represents hierarchical modules and items for a book
+type BookTreeResponse struct {
+	BookID  string              `json:"book_id"`
+	Title   string              `json:"title"`
+	Items   []entities.BookItem `json:"items"` // items directly under book
+	Modules []ModuleNode        `json:"modules"`
+}
+
+type ModuleNode struct {
+	ID          string              `json:"id"`
+	Title       string              `json:"title"`
+	Description string              `json:"description"`
+	Order       int                 `json:"order"`
+	Items       []entities.BookItem `json:"items"`
+	Children    []ModuleNode        `json:"children"`
+}
+
 // StartMemorizationResult represents the result of starting book item memorization
 type StartMemorizationResult struct {
-	ItemID      uuid.UUID `json:"item_id"`
-	BookItemID  uuid.UUID `json:"book_item_id"`
-	BookTitle   string    `json:"book_title"`
-	ItemTitle   string    `json:"item_title"`
-	Status      string    `json:"status"`
+	ItemID     uuid.UUID `json:"item_id"`
+	BookItemID uuid.UUID `json:"book_item_id"`
+	BookTitle  string    `json:"book_title"`
+	ItemTitle  string    `json:"item_title"`
+	Status     string    `json:"status"`
 }
 
 type bookService struct {
@@ -113,6 +131,87 @@ func (s *bookService) GetBookDetail(bookID string, userID *uuid.UUID) (*entities
 	}
 
 	return book, nil
+}
+
+func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeResponse, error) {
+	// Access control like GetBookDetail
+	book, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+	if book.Status != entities.BookStatusPublished {
+		if userID == nil || book.OwnerID != *userID {
+			return nil, errors.New("you don't have access to this book")
+		}
+	}
+
+	// Load all modules and items for this book
+	modules, err := s.bookModuleRepo.FindByBookID(bookID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.bookItemRepo.FindByBookID(bookID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group items by module_id (nil goes to book-level)
+	bookItems := make([]entities.BookItem, 0)
+	itemsByModule := make(map[string][]entities.BookItem)
+	for _, it := range items {
+		if it.ModuleID == nil {
+			bookItems = append(bookItems, it)
+			continue
+		}
+		key := it.ModuleID.String()
+		itemsByModule[key] = append(itemsByModule[key], it)
+	}
+
+	// Build module map and children links
+	type modWrap struct {
+		mod      entities.BookModule
+		children []string
+	}
+	modMap := make(map[string]*entities.BookModule)
+	childrenByParent := make(map[string][]string)
+	for i := range modules {
+		m := &modules[i]
+		id := m.ID.String()
+		modMap[id] = m
+		parentKey := ""
+		if m.ParentID != nil {
+			parentKey = m.ParentID.String()
+		}
+		childrenByParent[parentKey] = append(childrenByParent[parentKey], id)
+	}
+
+	var build func(parentID string) []ModuleNode
+	build = func(parentID string) []ModuleNode {
+		childIDs := childrenByParent[parentID]
+		nodes := make([]ModuleNode, 0, len(childIDs))
+		for _, cid := range childIDs {
+			m := modMap[cid]
+			node := ModuleNode{
+				ID:          m.ID.String(),
+				Title:       m.Title,
+				Description: m.Description,
+				Order:       m.Order,
+				Items:       itemsByModule[cid],
+				Children:    build(cid),
+			}
+			nodes = append(nodes, node)
+		}
+		// Preserve original order: modules slice was ordered by "order" ASC
+		return nodes
+	}
+
+	tree := &BookTreeResponse{
+		BookID:  book.ID.String(),
+		Title:   book.Title,
+		Items:   bookItems,
+		Modules: build(""),
+	}
+	return tree, nil
 }
 
 func (s *bookService) UpdateBook(bookID string, ownerID uuid.UUID, title, description, coverImage string) (*entities.Book, error) {
@@ -320,7 +419,7 @@ func (s *bookService) DeleteModule(moduleID string, ownerID uuid.UUID) error {
 
 // ==================== ITEM CRUD ====================
 
-func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error) {
+func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error) {
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
@@ -349,15 +448,30 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		}
 	}
 
+	// Normalize estimation into seconds
+	estSeconds := 0
+	if estimateVal > 0 {
+		switch estimateUnit {
+		case "minutes", "minute", "min", "m":
+			estSeconds = estimateVal * 60
+		default:
+			estSeconds = estimateVal
+		}
+		if estSeconds < 0 {
+			estSeconds = 0
+		}
+	}
+
 	item := &entities.BookItem{
-		BookID:    uuid.MustParse(bookID),
-		ModuleID:  moduleID,
-		Title:     title,
-		Content:   content,
-		Answer:    answer,
-		Order:     order,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		BookID:                 uuid.MustParse(bookID),
+		ModuleID:               moduleID,
+		Title:                  title,
+		Content:                content,
+		Answer:                 answer,
+		Order:                  order,
+		EstimatedReviewSeconds: estSeconds,
+		CreatedAt:              time.Now(),
+		UpdatedAt:              time.Now(),
 	}
 
 	if err := s.bookItemRepo.Create(item); err != nil {
@@ -467,6 +581,8 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 		ContentRef: contentRef,
 		Status:     entities.ItemStatusMenghafal,
 	}
+	// copy estimation from book item into Item for daily usage
+	item.EstimatedReviewSeconds = bookItem.EstimatedReviewSeconds
 
 	if err := s.itemRepo.Create(item); err != nil {
 		return nil, err
@@ -480,4 +596,3 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 		Status:     item.Status,
 	}, nil
 }
-

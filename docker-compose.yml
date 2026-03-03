@@ -1,0 +1,55 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: hifzhun-postgres
+    environment:
+      POSTGRES_USER: hifzhun
+      POSTGRES_PASSWORD: hifzhun
+      POSTGRES_DB: hifzhun
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hifzhun"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: hifzhun-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hifzhun-api
+    environment:
+      APP_PORT: "3000"
+      DB_HOST: postgres
+      DB_USER: hifzhun
+      DB_PASSWORD: hifzhun
+      DB_NAME: hifzhun
+      DB_PORT: "5432"
+      DB_SSLMODE: disable
+      DB_TIMEZONE: Asia/Jakarta
+      REDIS_URL: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

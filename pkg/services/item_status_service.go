@@ -306,6 +306,17 @@ func (s *ItemStatusService) GetDeadlineItems(userID uuid.UUID) ([]entities.Item,
 	return userItems, nil
 }
 
+// GetItemDetail returns an item if it belongs to the given user
+func (s *ItemStatusService) GetItemDetail(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+	return item, nil
+}
 // DeactivateItem moves book item from fsrs_active → inactive
 // Only for non-quran items (book items)
 func (s *ItemStatusService) DeactivateItem(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {

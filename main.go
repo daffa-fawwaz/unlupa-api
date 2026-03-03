@@ -50,11 +50,11 @@ func main() {
 	app := fiber.New()
 
 	app.Use(cors.New(cors.Config{
-	AllowOrigins:     "http://localhost:5173,http://localhost:3000",
-	AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-	AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-	AllowCredentials: true,
-}))
+		AllowOrigins:     "http://localhost:5173,http://localhost:3000",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowCredentials: true,
+	}))
 
 	// Swagger route
 	app.Get("/swagger/*", fiberSwagger.WrapHandler)
@@ -67,6 +67,7 @@ func main() {
 	classRepo := repositories.NewClassRepository(config.DB)
 	classMemberRepo := repositories.NewClassMemberRepository(config.DB)
 	juzRepo := repositories.NewJuzRepository(config.DB)
+	bookRepo := repositories.NewBookRepository(config.DB)
 
 	// ================= AUTH =================
 	authSvc := services.NewAuthService()
@@ -98,72 +99,66 @@ func main() {
 		classRepo,
 		juzRepo,
 	)
-    dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo, appCache)
+	dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo, bookRepo, appCache)
 
+	dailyTaskActionRepo := repositories.NewDailyTaskActionRepository(config.DB)
 
-dailyTaskActionRepo := repositories.NewDailyTaskActionRepository(config.DB)
+	// graduation engine
+	graduationPreEngineRepo := repositories.NewItemGraduationRepository(config.DB)
+	graduationPreEngineSvc := services.NewGraduationPreEngine(graduationPreEngineRepo)
+	graduationPreEngineHandler := handlers.NewGraduationPreEngineHandler(graduationPreEngineSvc)
 
+	// ================= HAFALAN (JUZ & JUZ ITEM) =================
+	quranValidator, err := services.NewQuranValidator("data/surah.json")
+	if err != nil {
+		log.Fatalf("Failed to initialize QuranValidator: %v", err)
+	}
+	itemRepo := repositories.NewItemRepository(config.DB)
+	hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
+	juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo, appCache)
+	juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc, appCache)
 
+	// ================= BOOK =================
+	bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
+	bookItemRepo := repositories.NewBookItemRepository(config.DB)
+	bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo)
+	bookHandler := handlers.NewBookHandler(bookSvc, appCache)
 
-// graduation engine
-graduationPreEngineRepo := repositories.NewItemGraduationRepository(config.DB)
-graduationPreEngineSvc := services.NewGraduationPreEngine(graduationPreEngineRepo)
-graduationPreEngineHandler := handlers.NewGraduationPreEngineHandler(graduationPreEngineSvc)
+	// ================= ITEM STATUS =================
+	intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)
+	itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo)
+	itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc, juzItemRepo, bookRepo, bookItemRepo)
 
+	// ================= CLASS =================
+	classBookRepo := repositories.NewClassBookRepository(config.DB)
+	classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo)
+	classHandler := handlers.NewClassHandler(classSvc)
 
-// ================= HAFALAN (JUZ & JUZ ITEM) =================
-quranValidator, err := services.NewQuranValidator("data/surah.json")
-if err != nil {
-	log.Fatalf("Failed to initialize QuranValidator: %v", err)
-}
-itemRepo := repositories.NewItemRepository(config.DB)
-hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
-juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo, appCache)
-juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc, appCache)
+	// ================= ITEM REVIEW =================
+	itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo)
+	itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc, juzItemRepo, appCache)
 
-// ================= ITEM STATUS =================
-intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)
-itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo)
-itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc)
-
-// ================= BOOK =================
-bookRepo := repositories.NewBookRepository(config.DB)
-bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
-bookItemRepo := repositories.NewBookItemRepository(config.DB)
-bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo)
-bookHandler := handlers.NewBookHandler(bookSvc, appCache)
-
-// ================= CLASS =================
-classBookRepo := repositories.NewClassBookRepository(config.DB)
-classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo)
-classHandler := handlers.NewClassHandler(classSvc)
-
-// ================= ITEM REVIEW =================
-itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo)
-itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc, juzItemRepo, appCache)
-
-// ================= MY ITEMS =================
-myItemSvc := services.NewMyItemService(itemRepo, juzItemRepo, bookRepo, bookItemRepo)
-myItemHandler := handlers.NewMyItemHandler(myItemSvc, appCache)
+	// ================= MY ITEMS =================
+	myItemSvc := services.NewMyItemService(itemRepo, juzItemRepo, bookRepo, bookItemRepo)
+	myItemHandler := handlers.NewMyItemHandler(myItemSvc, appCache)
 
 	// ================= ROUTES =================
-routes.SetupRoutes(
-	app,
-	authHandler,
-	userHandler,
-	teacherReqHandler,
-	loadControlHandler,
-	dailyTaskHandler,
-	graduationPreEngineHandler,
-	juzHandler,
-	juzItemHandler,
-	itemStatusHandler,
-	itemReviewHandler,
-	bookHandler,
-	classHandler,
-	myItemHandler,
-)
-
+	routes.SetupRoutes(
+		app,
+		authHandler,
+		userHandler,
+		teacherReqHandler,
+		loadControlHandler,
+		dailyTaskHandler,
+		graduationPreEngineHandler,
+		juzHandler,
+		juzItemHandler,
+		itemStatusHandler,
+		itemReviewHandler,
+		bookHandler,
+		classHandler,
+		myItemHandler,
+	)
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {

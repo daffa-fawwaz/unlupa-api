@@ -17,6 +17,9 @@ type BookItem struct {
 	Answer  string `gorm:"type:text" json:"answer"`  // jawaban
 	Order   int    `gorm:"not null;default:0" json:"order"`
 
+	// Estimasi waktu review (detik) opsional untuk item buku.
+	EstimatedReviewSeconds int `gorm:"default:0" json:"estimated_review_seconds"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
