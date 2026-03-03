@@ -43,6 +43,7 @@ services:
       DB_SSLMODE: disable
       DB_TIMEZONE: Asia/Jakarta
       REDIS_URL: redis:6379
+      JWT_SECRET: supersecret123   # ⬅️ TAMBAHKAN INI
     depends_on:
       postgres:
         condition: service_healthy
