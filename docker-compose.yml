@@ -17,15 +17,6 @@ services:
       timeout: 3s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: hifzhun-redis
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   api:
     build:
       context: .
@@ -40,12 +31,10 @@ services:
       DB_PORT: "5432"
       DB_SSLMODE: disable
       DB_TIMEZONE: Asia/Jakarta
-      REDIS_URL: redis:6379
+      CACHE_DISABLED: "true"
       JWT_SECRET: supersecret123   # ⬅️ TAMBAHKAN INI
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     ports:
       - "3000:3000"

@@ -11,9 +11,18 @@ import (
 var RedisClient *redis.Client
 
 func InitRedis() {
+	// Allow disabling cache entirely via env
+	if os.Getenv("CACHE_DISABLED") == "true" {
+		log.Printf("⚠️  Cache disabled via env (CACHE_DISABLED=true)")
+		RedisClient = nil
+		return
+	}
+
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		redisURL = "localhost:6379"
+		log.Printf("⚠️  REDIS_URL not set, caching disabled")
+		RedisClient = nil
+		return
 	}
 
 	RedisClient = redis.NewClient(&redis.Options{
