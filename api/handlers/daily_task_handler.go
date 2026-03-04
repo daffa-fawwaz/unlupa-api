@@ -22,12 +22,14 @@ type DailyTaskResponse struct {
 	ContentRef string    `json:"content_ref" example:"surah:78:1-5"`
 	JuzIndex   int       `json:"juz_index" example:"30"`
 	EstimatedReviewSeconds int `json:"estimated_review_seconds" example:"120"`
+	BookTitle  string    `json:"book_title,omitempty" example:"Belajar Tajwid"`
 }
 
 type DailyTaskHandler struct {
 	service     services.DailyTaskService
 	itemRepo    *repositories.ItemRepository
 	juzItemRepo *repositories.JuzItemRepository
+	bookRepo    repositories.BookRepository
 	cache       *cache.Cache
 }
 
@@ -35,12 +37,14 @@ func NewDailyTaskHandler(
 	service services.DailyTaskService,
 	itemRepo *repositories.ItemRepository,
 	juzItemRepo *repositories.JuzItemRepository,
+	bookRepo repositories.BookRepository,
 	c *cache.Cache,
 ) *DailyTaskHandler {
 	return &DailyTaskHandler{
 		service:     service,
 		itemRepo:    itemRepo,
 		juzItemRepo: juzItemRepo,
+		bookRepo:    bookRepo,
 		cache:       c,
 	}
 }
@@ -127,12 +131,63 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 
 	itemMap := make(map[uuid.UUID]string)
 	itemEstimateMap := make(map[uuid.UUID]int)
+	bookIDs := make(map[string]struct{})
 	if len(itemIDs) > 0 {
 		items, err := h.itemRepo.FindByIDs(itemIDs)
 		if err == nil {
 			for _, item := range items {
 				itemMap[item.ID] = item.ContentRef
 				itemEstimateMap[item.ID] = item.EstimatedReviewSeconds
+				// Collect book IDs from content_ref "book:{book_id}:item:{book_item_id}"
+				if len(item.ContentRef) > 5 && item.ContentRef[:5] == "book:" {
+					parts := make([]string, 0, 4)
+					start := 0
+					for i := 0; i < len(item.ContentRef); i++ {
+						if item.ContentRef[i] == ':' {
+							parts = append(parts, item.ContentRef[start:i])
+							start = i + 1
+						}
+					}
+					parts = append(parts, item.ContentRef[start:])
+					if len(parts) >= 2 && parts[0] == "book" {
+						bid := parts[1]
+						if bid != "" {
+							bookIDs[bid] = struct{}{}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Fetch book titles
+	bookTitleByID := make(map[string]string)
+	for bid := range bookIDs {
+		if h.bookRepo != nil {
+			if book, err := h.bookRepo.FindByID(bid); err == nil {
+				bookTitleByID[bid] = book.Title
+			}
+		}
+	}
+
+	// Map item -> book title
+	bookTitleByItem := make(map[uuid.UUID]string)
+	for id, ref := range itemMap {
+		if len(ref) > 5 && ref[:5] == "book:" {
+			parts := make([]string, 0, 4)
+			start := 0
+			for i := 0; i < len(ref); i++ {
+				if ref[i] == ':' {
+					parts = append(parts, ref[start:i])
+					start = i + 1
+				}
+			}
+			parts = append(parts, ref[start:])
+			if len(parts) >= 2 && parts[0] == "book" {
+				bid := parts[1]
+				if title, ok := bookTitleByID[bid]; ok {
+					bookTitleByItem[id] = title
+				}
 			}
 		}
 	}
@@ -156,6 +211,7 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			ContentRef: itemMap[t.ItemID],
 			JuzIndex:   juzMap[t.ItemID.String()],
 			EstimatedReviewSeconds: itemEstimateMap[t.ItemID],
+			BookTitle:  bookTitleByItem[t.ItemID],
 		})
 	}
 

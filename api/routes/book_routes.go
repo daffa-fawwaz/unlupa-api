@@ -20,6 +20,7 @@ func RegisterBookRoutes(
 	books.Post("/", bookHandler.CreateBook)
 	books.Get("/", bookHandler.GetMyBooks)
 	books.Get("/published", bookHandler.GetPublishedBooks)
+	books.Get("/:id/tree", bookHandler.GetBookTree)
 
 	// Module static paths (before dynamic /:id)
 	books.Put("/modules/:id", bookHandler.UpdateModule)
@@ -41,4 +42,3 @@ func RegisterBookRoutes(
 	// Memorization - start memorizing a specific book item
 	books.Post("/:id/items/:item_id/start", bookHandler.StartMemorization)
 }
-

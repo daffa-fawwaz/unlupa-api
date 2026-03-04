@@ -156,13 +156,11 @@ func (s *ItemReviewService) ReviewItem(
 	nextReview = time.Date(nextReview.Year(), nextReview.Month(), nextReview.Day(), 0, 0, 0, 0, nextReview.Location())
 	item.NextReviewAt = &nextReview
 
-	// 12. Check for graduation - ONLY for quran items in fsrs_active
-	// Book items stay in fsrs_active forever (no auto-graduation)
-	// Graduation is TIME-BASED: item must have been in fsrs_active for >= 30 days
+	// 12. Check for graduation in fsrs_active
+	// Kriteria: (hari di fsrs_active >= 30) ATAU (stability >= threshold)
 	graduated := false
 	pendingGraduate := false
-	if item.Status == entities.ItemStatusFSRSActive &&
-		item.SourceType == "quran" {
+	if item.Status == entities.ItemStatusFSRSActive {
 
 		// Calculate how many days the item has been in fsrs_active phase
 		// FSRSStartAt = when item entered fsrs_active (day 1)
@@ -176,25 +174,36 @@ func (s *ItemReviewService) ReviewItem(
 
 		// Graduate if days in fsrs_active >= threshold OR stability >= threshold
 		if daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold {
-			// Check if user is in a Quran class - if yes, require teacher approval
-			if s.isUserInQuranClass(userID) {
-				item.Status = entities.ItemStatusPendingGraduate
-				pendingGraduate = true
+			// Quran items in class may require approval
+			if item.SourceType == "quran" {
+				if s.isUserInQuranClass(userID) {
+					item.Status = entities.ItemStatusPendingGraduate
+					pendingGraduate = true
+				} else {
+					item.Status = entities.ItemStatusGraduate
+					graduated = true
+				}
 			} else {
+				// Book and other items: graduate directly
 				item.Status = entities.ItemStatusGraduate
 				graduated = true
 			}
 		}
 	}
 
-	// 13. If item is graduate (just graduated or already graduate), set next review to 20 days
+	// 13. If item is graduate, handle next review policy
 	if item.Status == entities.ItemStatusGraduate {
-		graduateNextReview := now.AddDate(0, 0, entities.GraduateReviewDays)
-		// Normalize next review time to 00:00:00
-		graduateNextReview = time.Date(graduateNextReview.Year(), graduateNextReview.Month(), graduateNextReview.Day(), 0, 0, 0, 0, graduateNextReview.Location())
-		item.NextReviewAt = &graduateNextReview
-		nextReview = graduateNextReview
-		intervalDays = entities.GraduateReviewDays
+		if item.SourceType == "quran" {
+			// Quran: schedule periodic post-graduation review
+			graduateNextReview := now.AddDate(0, 0, entities.GraduateReviewDays)
+			graduateNextReview = time.Date(graduateNextReview.Year(), graduateNextReview.Month(), graduateNextReview.Day(), 0, 0, 0, 0, graduateNextReview.Location())
+			item.NextReviewAt = &graduateNextReview
+			nextReview = graduateNextReview
+			intervalDays = entities.GraduateReviewDays
+		} else {
+			// Book: no further review after graduation
+			item.NextReviewAt = nil
+		}
 	}
 
 	// 14. Save item

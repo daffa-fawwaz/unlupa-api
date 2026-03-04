@@ -298,22 +298,60 @@ func (h *BookHandler) AddModule(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 
 	var req struct {
-		Title       string     `json:"title"`
-		Description string     `json:"description"`
-		Order       int        `json:"order"`
-		ParentID    *uuid.UUID `json:"parent_id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Order       int    `json:"order"`
+		ParentID    string `json:"parent_id"` // optional UUID string
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	module, err := h.bookSvc.AddModule(bookID, userID, req.Title, req.Description, req.Order, req.ParentID)
+	var parentPtr *uuid.UUID
+	if req.ParentID != "" {
+		pid, err := uuid.Parse(req.ParentID)
+		if err != nil {
+			return utils.Error(c, fiber.StatusBadRequest, "invalid parent_id", "BAD_REQUEST", nil)
+		}
+		parentPtr = &pid
+	}
+
+	module, err := h.bookSvc.AddModule(bookID, userID, req.Title, req.Description, req.Order, parentPtr)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_MODULE_FAILED", nil)
 	}
 
 	return utils.Success(c, fiber.StatusCreated, "module added successfully", module, nil)
+}
+
+// GetBookTree godoc
+// @Summary Get book module tree
+// @Description Get hierarchical modules (with items) for a book
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /books/{id}/tree [get]
+func (h *BookHandler) GetBookTree(c *fiber.Ctx) error {
+	bookID := c.Params("id")
+	userIDInterface := c.Locals("user_id")
+
+	var userID *uuid.UUID
+	if userIDInterface != nil {
+		id := userIDInterface.(uuid.UUID)
+		userID = &id
+	}
+
+	tree, err := h.bookSvc.GetBookTree(bookID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, err.Error(), "BOOK_NOT_FOUND", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "book tree fetched successfully", tree, nil)
 }
 
 // UpdateModule godoc
@@ -391,17 +429,19 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 
 	var req struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		Answer  string `json:"answer"`
-		Order   int    `json:"order"`
+		Title         string `json:"title"`
+		Content       string `json:"content"`
+		Answer        string `json:"answer"`
+		Order         int    `json:"order"`
+		EstimateValue int    `json:"estimate_value"`
+		EstimateUnit  string `json:"estimate_unit"` // "seconds" | "minutes"
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(bookID, nil, userID, req.Title, req.Content, req.Answer, req.Order)
+	item, err := h.bookSvc.AddItem(bookID, nil, userID, req.Title, req.Content, req.Answer, req.Order, req.EstimateValue, req.EstimateUnit)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -431,18 +471,20 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		BookID  string `json:"book_id"`
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		Answer  string `json:"answer"`
-		Order   int    `json:"order"`
+		BookID        string `json:"book_id"`
+		Title         string `json:"title"`
+		Content       string `json:"content"`
+		Answer        string `json:"answer"`
+		Order         int    `json:"order"`
+		EstimateValue int    `json:"estimate_value"`
+		EstimateUnit  string `json:"estimate_unit"` // "seconds" | "minutes"
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(req.BookID, &moduleID, userID, req.Title, req.Content, req.Answer, req.Order)
+	item, err := h.bookSvc.AddItem(req.BookID, &moduleID, userID, req.Title, req.Content, req.Answer, req.Order, req.EstimateValue, req.EstimateUnit)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -540,19 +582,23 @@ type UpdateModuleRequest struct {
 
 // AddBookItemRequest represents add item to book request
 type AddBookItemRequest struct {
-	Title   string `json:"title" example:"Hukum Nun Mati"`
-	Content string `json:"content" example:"Penjelasan hukum nun mati..."`
-	Answer  string `json:"answer" example:"Jawaban dari pertanyaan..."`
-	Order   int    `json:"order" example:"1"`
+	Title         string `json:"title" example:"Hukum Nun Mati"`
+	Content       string `json:"content" example:"Penjelasan hukum nun mati..."`
+	Answer        string `json:"answer" example:"Jawaban dari pertanyaan..."`
+	Order         int    `json:"order" example:"1"`
+	EstimateValue int    `json:"estimate_value" example:"2"`
+	EstimateUnit  string `json:"estimate_unit" example:"minutes"`
 }
 
 // AddModuleItemRequest represents add item to module request
 type AddModuleItemRequest struct {
-	BookID  string `json:"book_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Title   string `json:"title" example:"Sub Item"`
-	Content string `json:"content" example:"Konten item..."`
-	Answer  string `json:"answer" example:"Jawaban..."`
-	Order   int    `json:"order" example:"1"`
+	BookID        string `json:"book_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Title         string `json:"title" example:"Sub Item"`
+	Content       string `json:"content" example:"Konten item..."`
+	Answer        string `json:"answer" example:"Jawaban..."`
+	Order         int    `json:"order" example:"1"`
+	EstimateValue int    `json:"estimate_value" example:"90"`
+	EstimateUnit  string `json:"estimate_unit" example:"seconds"`
 }
 
 // UpdateBookItemRequest represents update item request
@@ -589,4 +635,3 @@ func (h *BookHandler) StartMemorization(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusOK, "Item memorization started", result, nil)
 }
-

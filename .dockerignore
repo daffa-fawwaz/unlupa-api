@@ -1,0 +1,13 @@
+**/.git
+**/.gitignore
+**/.idea
+**/.vscode
+**/node_modules
+**/dist
+**/build
+**/*.log
+tmp
+vendor
+.env
+data/*
+!data/surah.json

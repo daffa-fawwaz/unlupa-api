@@ -36,8 +36,8 @@ func SetupRoutes(
 	RegisterBookRoutes(v1, bookHandler)
 	RegisterClassRoutes(v1, classHandler)
 	RegisterMyItemRoutes(v1, myItemHandler)
+	v1.Get("/health", handlers.Health)
 }
-
 
 
 

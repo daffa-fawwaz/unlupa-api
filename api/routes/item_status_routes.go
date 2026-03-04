@@ -26,6 +26,9 @@ func RegisterItemStatusRoutes(
 	// Review item in interval phase
 	items.Post("/:item_id/review-interval", handler.ReviewInterval)
 
+	// Get item detail
+	items.Get("/:item_id", handler.GetDetail)
+
 	// Activate FSRS phase (user decision)
 	items.Post("/:item_id/activate-fsrs", handler.ActivateToFSRS)
 
@@ -39,4 +42,3 @@ func RegisterItemStatusRoutes(
 	items.Post("/:item_id/deactivate", handler.DeactivateItem)
 	items.Post("/:item_id/reactivate", handler.ReactivateItem)
 }
-

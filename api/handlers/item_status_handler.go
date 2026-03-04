@@ -1,19 +1,25 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
 )
 
 type ItemStatusHandler struct {
-	service *services.ItemStatusService
+	service      *services.ItemStatusService
+	juzItemRepo  *repositories.JuzItemRepository
+	bookRepo     repositories.BookRepository
+	bookItemRepo repositories.BookItemRepository
 }
 
-func NewItemStatusHandler(s *services.ItemStatusService) *ItemStatusHandler {
-	return &ItemStatusHandler{service: s}
+func NewItemStatusHandler(s *services.ItemStatusService, juzItemRepo *repositories.JuzItemRepository, bookRepo repositories.BookRepository, bookItemRepo repositories.BookItemRepository) *ItemStatusHandler {
+	return &ItemStatusHandler{service: s, juzItemRepo: juzItemRepo, bookRepo: bookRepo, bookItemRepo: bookItemRepo}
 }
 
 // StartIntervalRequest represents start interval request
@@ -60,14 +66,14 @@ type ReviewIntervalRequest struct {
 
 // ReviewIntervalResponse represents interval review response
 type ReviewIntervalResponse struct {
-	ItemID               uuid.UUID  `json:"item_id"`
-	Status               string     `json:"status"`
-	Rating               int        `json:"rating"`
-	RatingLabel          string     `json:"rating_label"`
-	IntervalDays         int        `json:"interval_days"`
-	IntervalNextReviewAt *string    `json:"interval_next_review_at"`
-	ReviewCount          int        `json:"review_count"`
-	ContentRef           string     `json:"content_ref"`
+	ItemID               uuid.UUID `json:"item_id"`
+	Status               string    `json:"status"`
+	Rating               int       `json:"rating"`
+	RatingLabel          string    `json:"rating_label"`
+	IntervalDays         int       `json:"interval_days"`
+	IntervalNextReviewAt *string   `json:"interval_next_review_at"`
+	ReviewCount          int       `json:"review_count"`
+	ContentRef           string    `json:"content_ref"`
 }
 
 // ReviewInterval godoc
@@ -124,6 +130,102 @@ func (h *ItemStatusHandler) ReviewInterval(c *fiber.Ctx) error {
 	}
 
 	return utils.Success(c, fiber.StatusOK, "Interval review submitted", resp, nil)
+}
+
+// ItemDetailResponse represents enriched item detail
+type ItemDetailResponse struct {
+	ItemID                 uuid.UUID `json:"item_id"`
+	SourceType             string    `json:"source_type"`
+	Status                 string    `json:"status"`
+	ContentRef             string    `json:"content_ref"`
+	EstimatedReviewSeconds int       `json:"estimated_review_seconds"`
+	IntervalDays           int       `json:"interval_days"`
+	IntervalNextReviewAt   *string   `json:"interval_next_review_at,omitempty"`
+	NextReviewAt           *string   `json:"next_review_at,omitempty"`
+	Stability              float64   `json:"stability"`
+	Difficulty             float64   `json:"difficulty"`
+	ReviewCount            int       `json:"review_count"`
+	BookTitle              *string   `json:"book_title,omitempty"`
+	BookItemTitle          *string   `json:"book_item_title,omitempty"`
+	JuzIndex               *int      `json:"juz_index,omitempty"`
+	Question               *string   `json:"question,omitempty"`
+	Answer                 *string   `json:"answer,omitempty"`
+}
+
+// GetDetail godoc
+// @Summary Get item detail
+// @Description Get detailed information for an item, with book/juz enrichment
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Success 200 {object} utils.SuccessResponse{data=ItemDetailResponse}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id} [get]
+func (h *ItemStatusHandler) GetDetail(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+
+	item, err := h.service.GetItemDetail(itemID, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "GET_ITEM_FAILED", nil)
+	}
+
+	var intervalNextStr *string
+	if item.IntervalNextReviewAt != nil {
+		s := item.IntervalNextReviewAt.Format("2006-01-02 15:04")
+		intervalNextStr = &s
+	}
+	var nextReviewStr *string
+	if item.NextReviewAt != nil {
+		s := item.NextReviewAt.Format("2006-01-02 15:04")
+		nextReviewStr = &s
+	}
+
+	resp := ItemDetailResponse{
+		ItemID:                 item.ID,
+		SourceType:             item.SourceType,
+		Status:                 item.Status,
+		ContentRef:             item.ContentRef,
+		EstimatedReviewSeconds: item.EstimatedReviewSeconds,
+		IntervalDays:           item.IntervalDays,
+		IntervalNextReviewAt:   intervalNextStr,
+		NextReviewAt:           nextReviewStr,
+		Stability:              item.Stability,
+		Difficulty:             item.Difficulty,
+		ReviewCount:            item.ReviewCount,
+	}
+
+	// Enrich book or juz info
+	if item.SourceType == "quran" && h.juzItemRepo != nil {
+		if idx, err := h.juzItemRepo.FindJuzIndexByItemID(item.ID.String()); err == nil && idx > 0 {
+			resp.JuzIndex = &idx
+		}
+	} else if item.SourceType == "book" && h.bookRepo != nil && h.bookItemRepo != nil {
+		parts := strings.Split(item.ContentRef, ":")
+		if len(parts) == 4 && parts[0] == "book" && parts[2] == "item" {
+			bookID := parts[1]
+			bookItemID := parts[3]
+			if b, err := h.bookRepo.FindByID(bookID); err == nil {
+				title := b.Title
+				resp.BookTitle = &title
+			}
+			if bi, err := h.bookItemRepo.FindByID(bookItemID); err == nil {
+				bit := bi.Title
+				resp.BookItemTitle = &bit
+				q := bi.Content
+				a := bi.Answer
+				resp.Question = &q
+				resp.Answer = &a
+			}
+		}
+	}
+
+	return utils.Success(c, fiber.StatusOK, "Item detail", resp, nil)
 }
 
 // IntervalStatsResponse represents interval stats response
