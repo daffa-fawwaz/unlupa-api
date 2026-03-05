@@ -50,7 +50,6 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 
 	// Transition to interval with recurring review
 	now := time.Now()
-
 	// Target date (hari + interval)
 	targetDate := now.AddDate(0, 0, intervalDays)
 
@@ -317,6 +316,7 @@ func (s *ItemStatusService) GetItemDetail(itemID uuid.UUID, userID uuid.UUID) (*
 	}
 	return item, nil
 }
+
 // DeactivateItem moves book item from fsrs_active → inactive
 // Only for non-quran items (book items)
 func (s *ItemStatusService) DeactivateItem(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
