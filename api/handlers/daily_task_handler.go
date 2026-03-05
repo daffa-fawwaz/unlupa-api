@@ -15,14 +15,14 @@ import (
 
 // DailyTaskResponse represents daily task response
 type DailyTaskResponse struct {
-	ItemID     uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Source     string    `json:"source" example:"quran"`
-	State      string    `json:"state" example:"pending"`
-	TaskDate   string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
-	ContentRef string    `json:"content_ref" example:"surah:78:1-5"`
-	JuzIndex   int       `json:"juz_index" example:"30"`
-	EstimatedReviewSeconds int `json:"estimated_review_seconds" example:"120"`
-	BookTitle  string    `json:"book_title,omitempty" example:"Belajar Tajwid"`
+	ItemID                 uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Source                 string    `json:"source" example:"quran"`
+	State                  string    `json:"state" example:"pending"`
+	TaskDate               string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
+	ContentRef             string    `json:"content_ref" example:"surah:78:1-5"`
+	JuzIndex               int       `json:"juz_index" example:"30"`
+	EstimatedReviewSeconds int       `json:"estimated_review_seconds" example:"120"`
+	BookTitle              string    `json:"book_title,omitempty" example:"Belajar Tajwid"`
 }
 
 type DailyTaskHandler struct {
@@ -68,19 +68,37 @@ func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 	}
 
 	limit, _ := strconv.Atoi(c.Query("limit", "0"))
+	// Optional client date (YYYY-MM-DD) to align with device date
+	dateStr := c.Query("date", "")
+	var now time.Time
+	if dateStr != "" {
+		// Parse client date at 00:00 local time
+		if t, err := time.ParseInLocation("2006-01-02", dateStr, time.Local); err == nil {
+			now = t
+		} else {
+			now = time.Now()
+		}
+	} else {
+		now = time.Now()
+	}
 
 	tasks, err := h.service.GenerateToday(
 		c.Context(),
 		userID,
-		time.Now(),
+		now,
 		limit,
 	)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
+	// Invalidate today's cache so ListToday reflects newly generated tasks
+	date := now.Format("2006-01-02")
+	cacheKey := fmt.Sprintf("daily:%s:%s", userID.String(), date)
+	h.cache.Delete(c.Context(), cacheKey)
+
 	return c.JSON(fiber.Map{
-		"task_date": time.Now().Format("2006-01-02"),
+		"task_date": date,
 		"count":     len(tasks),
 	})
 }
@@ -102,7 +120,18 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		return fiber.ErrUnauthorized
 	}
 
-	now := time.Now()
+	// Optional client date (YYYY-MM-DD)
+	dateStr := c.Query("date", "")
+	var now time.Time
+	if dateStr != "" {
+		if t, err := time.ParseInLocation("2006-01-02", dateStr, time.Local); err == nil {
+			now = t
+		} else {
+			now = time.Now()
+		}
+	} else {
+		now = time.Now()
+	}
 	date := now.Format("2006-01-02")
 
 	// Try cache first
@@ -204,18 +233,18 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	resp := make([]DailyTaskResponse, 0, len(tasks))
 	for _, t := range tasks {
 		resp = append(resp, DailyTaskResponse{
-			ItemID:     t.ItemID,
-			Source:     t.Source,
-			State:      t.State,
-			TaskDate:   t.TaskDate.Format("2006-01-02"),
-			ContentRef: itemMap[t.ItemID],
-			JuzIndex:   juzMap[t.ItemID.String()],
+			ItemID:                 t.ItemID,
+			Source:                 t.Source,
+			State:                  t.State,
+			TaskDate:               t.TaskDate.Format("2006-01-02"),
+			ContentRef:             itemMap[t.ItemID],
+			JuzIndex:               juzMap[t.ItemID.String()],
 			EstimatedReviewSeconds: itemEstimateMap[t.ItemID],
-			BookTitle:  bookTitleByItem[t.ItemID],
+			BookTitle:              bookTitleByItem[t.ItemID],
 		})
 	}
 
-	// Cache until midnight
+	// Cache until midnight of the provided date
 	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
 	ttl := time.Until(midnight)
 	h.cache.Set(c.Context(), cacheKey, resp, ttl)
