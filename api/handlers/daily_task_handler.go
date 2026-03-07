@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hifzhun-api/pkg/cache"
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 )
@@ -72,14 +73,13 @@ func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 	dateStr := c.Query("date", "")
 	var now time.Time
 	if dateStr != "" {
-		// Parse client date at 00:00 local time
-		if t, err := time.ParseInLocation("2006-01-02", dateStr, time.Local); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", dateStr, config.AppLocation); err == nil {
 			now = t
 		} else {
-			now = time.Now()
+			now = time.Now().In(config.AppLocation)
 		}
 	} else {
-		now = time.Now()
+		now = time.Now().In(config.AppLocation)
 	}
 
 	tasks, err := h.service.GenerateToday(
@@ -124,13 +124,13 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	dateStr := c.Query("date", "")
 	var now time.Time
 	if dateStr != "" {
-		if t, err := time.ParseInLocation("2006-01-02", dateStr, time.Local); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", dateStr, config.AppLocation); err == nil {
 			now = t
 		} else {
-			now = time.Now()
+			now = time.Now().In(config.AppLocation)
 		}
 	} else {
-		now = time.Now()
+		now = time.Now().In(config.AppLocation)
 	}
 	date := now.Format("2006-01-02")
 
@@ -259,8 +259,8 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		})
 	}
 
-	// Cache until midnight of the provided date
-	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	// Cache until midnight of the provided date (app timezone)
+	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, config.AppLocation)
 	ttl := time.Until(midnight)
 	h.cache.Set(c.Context(), cacheKey, resp, ttl)
 
