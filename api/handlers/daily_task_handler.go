@@ -150,6 +150,21 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
+	// Auto-fallback: if no snapshot exists, generate now and return
+	if len(tasks) == 0 {
+		gen, genErr := h.service.GenerateToday(
+			c.Context(),
+			userID,
+			now,
+			0,
+		)
+		if genErr == nil {
+			tasks = gen
+			// Drop any stale cache for this date
+			h.cache.Delete(c.Context(), cacheKey)
+		}
+	}
+
 	// Collect item IDs for batch lookup
 	itemIDs := make([]uuid.UUID, 0, len(tasks))
 	itemIDStrings := make([]string, 0, len(tasks))
