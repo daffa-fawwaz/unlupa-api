@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -24,6 +25,11 @@ type DailyTaskResponse struct {
 	JuzIndex               int       `json:"juz_index" example:"30"`
 	EstimatedReviewSeconds int       `json:"estimated_review_seconds" example:"120"`
 	BookTitle              string    `json:"book_title,omitempty" example:"Belajar Tajwid"`
+}
+
+type DailyTaskGroup struct {
+	JuzIndex int                 `json:"juz_index" example:"30"`
+	Items    []DailyTaskResponse `json:"items"`
 }
 
 type DailyTaskHandler struct {
@@ -134,10 +140,15 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	}
 	date := now.Format("2006-01-02")
 
-	// Try cache first
-	cacheKey := fmt.Sprintf("daily:%s:%s", userID.String(), date)
+	group := c.Query("group", "")
+	// Try cache first (include group key)
+	cacheKey := fmt.Sprintf("daily:%s:%s:%s", userID.String(), date, group)
 	var cached []DailyTaskResponse
 	if h.cache.Get(c.Context(), cacheKey, &cached) {
+		if group == "juz" {
+			grouped := groupByJuz(cached)
+			return c.JSON(grouped)
+		}
 		return c.JSON(cached)
 	}
 
@@ -264,5 +275,36 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	ttl := time.Until(midnight)
 	h.cache.Set(c.Context(), cacheKey, resp, ttl)
 
+	if group == "juz" {
+		grouped := groupByJuz(resp)
+		return c.JSON(grouped)
+	}
+
 	return c.JSON(resp)
+}
+
+func groupByJuz(items []DailyTaskResponse) []DailyTaskGroup {
+	buckets := make(map[int][]DailyTaskResponse)
+	for _, it := range items {
+		buckets[it.JuzIndex] = append(buckets[it.JuzIndex], it)
+	}
+	// order by juz_index ascending; push 0 to the end
+	indexes := make([]int, 0, len(buckets))
+	for idx := range buckets {
+		indexes = append(indexes, idx)
+	}
+	sort.Ints(indexes)
+	var result []DailyTaskGroup
+	// collect non-zero
+	for _, idx := range indexes {
+		if idx == 0 {
+			continue
+		}
+		result = append(result, DailyTaskGroup{JuzIndex: idx, Items: buckets[idx]})
+	}
+	// append zero group last if exists
+	if items0, ok := buckets[0]; ok {
+		result = append(result, DailyTaskGroup{JuzIndex: 0, Items: items0})
+	}
+	return result
 }

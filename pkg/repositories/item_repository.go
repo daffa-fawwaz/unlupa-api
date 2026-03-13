@@ -28,6 +28,10 @@ func (r *ItemRepository) GetByID(id uuid.UUID) (*entities.Item, error) {
 	return &item, err
 }
 
+func (r *ItemRepository) DeleteByID(id uuid.UUID) error {
+	return r.db.Where("id = ?", id).Delete(&entities.Item{}).Error
+}
+
 func (r *ItemRepository) FindByOwnerAndStatus(ownerID uuid.UUID, status string) ([]entities.Item, error) {
 	var items []entities.Item
 	err := r.db.Where("owner_id = ? AND status = ?", ownerID, status).Find(&items).Error

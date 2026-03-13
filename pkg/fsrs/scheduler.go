@@ -6,6 +6,7 @@ import (
 )
 
 const DefaultRetention = 0.9
+const goodGainDamping = 0.6 // reduce stability jump for rating=Good (3)
 
 type ReviewResult struct {
 	NewState CardState
@@ -48,6 +49,11 @@ func Review(
 		}
 		if rating == Easy {
 			Snew *= w.W[9]
+		}
+		// Dampen growth specifically for Good to avoid too large jumps
+		if rating == Good {
+			// move partially towards computed Snew
+			Snew = state.Stability + (Snew-state.Stability)*goodGainDamping
 		}
 	}
 

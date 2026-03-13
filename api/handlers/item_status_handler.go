@@ -228,6 +228,40 @@ func (h *ItemStatusHandler) GetDetail(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.StatusOK, "Item detail", resp, nil)
 }
 
+// UpdateIntervalDaysRequest represents request to update interval days
+type UpdateIntervalDaysRequest struct {
+	IntervalDays int `json:"interval_days" example:"7"`
+}
+
+// UpdateIntervalDays godoc
+// @Summary Update interval days for interval phase
+// @Description Change interval_days and set next interval review to now + interval_days (00:00)
+// @Tags Item Status
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param item_id path string true "Item ID"
+// @Param request body UpdateIntervalDaysRequest true "New interval days"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Item}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /items/{item_id}/interval-days [patch]
+func (h *ItemStatusHandler) UpdateIntervalDays(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	itemID, err := uuid.Parse(c.Params("item_id"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
+	}
+	var req UpdateIntervalDaysRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid request body", "INVALID_REQUEST_BODY", nil)
+	}
+	item, err := h.service.UpdateIntervalDays(itemID, userID, req.IntervalDays)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_INTERVAL_DAYS_FAILED", nil)
+	}
+	return utils.Success(c, fiber.StatusOK, "Interval days updated", item, nil)
+}
+
 // IntervalStatsResponse represents interval stats response
 type IntervalStatsResponse struct {
 	ItemID        uuid.UUID `json:"item_id"`

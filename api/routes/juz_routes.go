@@ -22,4 +22,6 @@ func RegisterJuzRoutes(
 	juz.Post("/:index/activate", juzHandler.Activate)
 	juz.Post("/:index/deactivate", juzHandler.Deactivate)
 	juz.Post("/:juz_id/items", juzItemHandler.Create)
+	juz.Put("/items/:item_id", juzItemHandler.Update)
+	juz.Delete("/items/:item_id", juzItemHandler.Delete)
 }

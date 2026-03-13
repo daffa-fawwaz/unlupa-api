@@ -52,7 +52,7 @@ func main() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173,https://unlupa.id,https://www.unlupa.id,https://api.unlupa.id",
-		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: true,
 	}))
@@ -117,7 +117,7 @@ func main() {
 	itemRepo := repositories.NewItemRepository(config.DB)
 	hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
 	juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo, appCache)
-	juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc, appCache)
+	juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc, appCache, itemRepo, juzItemRepo)
 
 	// ================= BOOK =================
 	bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
