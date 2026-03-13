@@ -76,6 +76,42 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 	return item, nil
 }
 
+// UpdateIntervalDays updates interval_days and recalculates next interval review from now
+func (s *ItemStatusService) UpdateIntervalDays(itemID uuid.UUID, userID uuid.UUID, intervalDays int) (*entities.Item, error) {
+	if intervalDays < 1 {
+		return nil, errors.New("interval_days must be at least 1")
+	}
+	item, err := s.itemRepo.GetByID(itemID)
+	if err != nil {
+		return nil, errors.New("item not found")
+	}
+	if item.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+	// Only allow edit in interval phase
+	if item.Status != entities.ItemStatusInterval {
+		return nil, errors.New("item must be in 'interval' status to change interval_days")
+	}
+
+	now := time.Now()
+	targetDate := now.AddDate(0, 0, intervalDays)
+	nextReview := time.Date(
+		targetDate.Year(),
+		targetDate.Month(),
+		targetDate.Day(),
+		0, 0, 0, 0,
+		targetDate.Location(),
+	)
+
+	item.IntervalDays = intervalDays
+	item.IntervalNextReviewAt = &nextReview
+
+	if err := s.itemRepo.Update(item); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 // IntervalReviewResult represents the result of an interval review
 type IntervalReviewResult struct {
 	Item         *entities.Item `json:"item"`
@@ -214,17 +250,9 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 
 	now := time.Now()
 
-	// Hitung next review berdasarkan interval sebelumnya
-	targetDate := now.AddDate(0, 0, item.IntervalDays)
-
-	// Normalize ke 00:00
-	nextReview := time.Date(
-		targetDate.Year(),
-		targetDate.Month(),
-		targetDate.Day(),
-		0, 0, 0, 0,
-		targetDate.Location(),
-	)
+	// Next review besok 00:00
+	nextDay := now.AddDate(0, 0, 1)
+	nextReview := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, nextDay.Location())
 
 	item.Status = entities.ItemStatusFSRSActive
 	item.IntervalEndAt = &now
@@ -249,6 +277,9 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 
 // GetItemsByStatus returns items by status for a user
 func (s *ItemStatusService) GetItemsByStatus(userID uuid.UUID, status string) ([]entities.Item, error) {
+	if status == "ujian" {
+		status = entities.ItemStatusFSRSActive
+	}
 	// Validate status
 	validStatuses := map[string]bool{
 		entities.ItemStatusMenghafal:       true,

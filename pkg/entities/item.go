@@ -75,6 +75,10 @@ func (i Item) MarshalJSON() ([]byte, error) {
 		safe.Difficulty = 0
 	}
 
+	if safe.Status == ItemStatusFSRSActive {
+		safe.Status = "ujian"
+	}
+
 	return json.Marshal(safe)
 }
 

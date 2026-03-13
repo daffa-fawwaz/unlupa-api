@@ -172,8 +172,10 @@ func (s *ItemReviewService) ReviewItem(
 			daysInFSRSActive = int(now.Sub(*item.IntervalEndAt).Hours() / 24)
 		}
 
-		// Graduate if days in fsrs_active >= threshold OR stability >= threshold
-		if daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold {
+		// Graduate if threshold met and minimal review count terpenuhi
+		minReviews := 5
+		thresholdMet := daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold
+		if thresholdMet && item.ReviewCount >= minReviews {
 			// Quran items in class may require approval
 			if item.SourceType == "quran" {
 				if s.isUserInQuranClass(userID) {

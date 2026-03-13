@@ -35,6 +35,9 @@ func RegisterItemStatusRoutes(
 	// Get interval review statistics
 	items.Get("/:item_id/interval-stats", handler.GetIntervalStats)
 
+	// Update interval days
+	items.Patch("/:item_id/interval-days", handler.UpdateIntervalDays)
+
 	// Review item (FSRS) - auto graduate at 30 days for quran items
 	items.Post("/:item_id/review", reviewHandler.ReviewItem)
 

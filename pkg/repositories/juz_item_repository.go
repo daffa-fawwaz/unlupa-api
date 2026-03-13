@@ -18,6 +18,10 @@ func (r *JuzItemRepository) Create(rel *entities.JuzItem) error {
 	return r.db.Create(rel).Error
 }
 
+func (r *JuzItemRepository) DeleteByItemID(itemID string) error {
+	return r.db.Where("item_id = ?", itemID).Delete(&entities.JuzItem{}).Error
+}
+
 // FindJuzIndexByItemID returns the juz index for a given item ID
 func (r *JuzItemRepository) FindJuzIndexByItemID(itemID string) (int, error) {
 	var result struct {

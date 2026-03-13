@@ -150,6 +150,10 @@ func (s *dailyTaskService) GenerateToday(
 		if item.Difficulty <= 0 {
 			item.Difficulty = 5.0
 		}
+		// Next review besok 00:00
+		nextDay := now.AddDate(0, 0, 1)
+		nr := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, nextDay.Location())
+		item.NextReviewAt = &nr
 		s.itemRepo.Update(&item)
 	}
 
