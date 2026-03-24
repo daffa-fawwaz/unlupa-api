@@ -59,4 +59,21 @@ func (r *JuzRepository) SetActiveByIndex(userID string, index int, active bool) 
 		Error
 }
 
+// SetDoneByIndex toggles is_done (and sets done_at) for a user's juz by index
+func (r *JuzRepository) SetDoneByIndex(userID string, index int, done bool) error {
+	updates := map[string]any{
+		"is_done": done,
+	}
+	if done {
+		updates["done_at"] = gorm.Expr("NOW()")
+	} else {
+		updates["done_at"] = nil
+	}
+	return r.db.
+		Model(&entities.Juz{}).
+		Where("user_id = ? AND index = ?", userID, index).
+		Updates(updates).
+		Error
+}
+
 // NOTE: explicit order management removed; rotation uses index of active juzs.

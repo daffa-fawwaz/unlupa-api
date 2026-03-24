@@ -37,7 +37,7 @@ func (u *authUsecase) Register(user *entities.User) error {
 func (u *authUsecase) Login(email, password string) (*entities.User, string, error) {
 	user, err := u.userRepo.FindByEmail(email)
 	if err != nil {
-		return nil, "", errors.New("email not found")
+		return nil, "", errors.New("Invalid email or password")
 	}
 
 	if !user.IsActive {
@@ -45,7 +45,7 @@ func (u *authUsecase) Login(email, password string) (*entities.User, string, err
 	}
 
 	if err := u.authSvc.CheckPassword(user.Password, password); err != nil {
-		return nil, "", errors.New("wrong password")
+		return nil, "", errors.New("Invalid email or password")
 	}
 
 	token, err := u.authSvc.GenerateToken(user.ID, user.Email, user.Role)
