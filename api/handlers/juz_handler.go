@@ -128,15 +128,85 @@ func (h *JuzHandler) Deactivate(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.StatusOK, "Juz deactivated", map[string]any{"index": juzIndex, "active": false}, nil)
 }
 
+// MarkDone godoc
+// @Summary Tandai juz selesai
+// @Description Menandai juz sebagai selesai (done)
+// @Tags Juz
+// @Produce json
+// @Security BearerAuth
+// @Param index path int true "Juz index (1-30)"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /juz/{index}/done [post]
+func (h *JuzHandler) MarkDone(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	juzIndex, err := strconv.Atoi(c.Params("index"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid juz index parameter", "INVALID_PARAMETER", nil)
+	}
+
+	j, err := h.juzRepo.FindByUserAndIndex(userID.String(), juzIndex)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, "Juz not found for user", "JUZ_NOT_FOUND", nil)
+	}
+
+	now := time.Now()
+	j.IsDone = true
+	j.DoneAt = &now
+	if err := h.juzRepo.Update(j); err != nil {
+		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "UPDATE_JUZ_FAILED", nil)
+	}
+
+	h.invalidateJuzCache(c, userID)
+	return utils.Success(c, fiber.StatusOK, "Juz marked done", map[string]any{"index": juzIndex, "done": true, "done_at": now}, nil)
+}
+
+// MarkUndone godoc
+// @Summary Tandai juz belum selesai
+// @Description Membatalkan status selesai (done) pada juz
+// @Tags Juz
+// @Produce json
+// @Security BearerAuth
+// @Param index path int true "Juz index (1-30)"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /juz/{index}/undone [post]
+func (h *JuzHandler) MarkUndone(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	juzIndex, err := strconv.Atoi(c.Params("index"))
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid juz index parameter", "INVALID_PARAMETER", nil)
+	}
+
+	j, err := h.juzRepo.FindByUserAndIndex(userID.String(), juzIndex)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, "Juz not found for user", "JUZ_NOT_FOUND", nil)
+	}
+
+	j.IsDone = false
+	j.DoneAt = nil
+	if err := h.juzRepo.Update(j); err != nil {
+		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "UPDATE_JUZ_FAILED", nil)
+	}
+
+	h.invalidateJuzCache(c, userID)
+	return utils.Success(c, fiber.StatusOK, "Juz marked undone", map[string]any{"index": juzIndex, "done": false}, nil)
+}
+
 // JuzWithStatusCount response struct
 type JuzWithStatusCount struct {
-	JuzID      uuid.UUID `json:"juz_id"`
-	JuzIndex   int       `json:"juz_index"`
-	TotalItems int       `json:"total_items"`
-	Menghafal  int       `json:"menghafal"`
-	Interval   int       `json:"interval"`
-	FSRSActive int       `json:"fsrs_active"`
-	Graduate   int       `json:"graduate"`
+	JuzID      uuid.UUID  `json:"juz_id"`
+	JuzIndex   int        `json:"juz_index"`
+	IsActive   bool       `json:"is_active"`
+	IsDone     bool       `json:"is_done"`
+	DoneAt     *time.Time `json:"done_at"`
+	TotalItems int        `json:"total_items"`
+	Menghafal  int        `json:"menghafal"`
+	Interval   int        `json:"interval"`
+	FSRSActive int        `json:"fsrs_active"`
+	Graduate   int        `json:"graduate"`
 }
 
 // GetMyJuz godoc
@@ -214,6 +284,9 @@ func (h *JuzHandler) GetMyJuz(c *fiber.Ctx) error {
 		entry := JuzWithStatusCount{
 			JuzID:    j.ID,
 			JuzIndex: j.Index,
+			IsActive: j.IsActive,
+			IsDone:   j.IsDone,
+			DoneAt:   j.DoneAt,
 		}
 		if sm, ok := juzStatusMap[j.ID.String()]; ok {
 			entry.TotalItems = sm.Total
