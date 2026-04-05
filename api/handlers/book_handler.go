@@ -111,12 +111,13 @@ func (h *BookHandler) GetPublishedBooks(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Book ID"
-// @Success 200 {object} utils.SuccessResponse{data=entities.Book}
+// @Success 200 {object} utils.SuccessResponse{data=services.BookDetailWithStability}
 // @Failure 404 {object} utils.ErrorResponse
 // @Router /books/{id} [get]
 func (h *BookHandler) GetBookDetail(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 	userIDInterface := c.Locals("user_id")
+	userRole := c.Locals("role")
 
 	var userID *uuid.UUID
 	if userIDInterface != nil {
@@ -124,12 +125,39 @@ func (h *BookHandler) GetBookDetail(c *fiber.Ctx) error {
 		userID = &id
 	}
 
-	book, err := h.bookSvc.GetBookDetail(bookID, userID)
+	var role string
+	if userRole != nil {
+		role = userRole.(string)
+	}
+
+	book, err := h.bookSvc.GetBookDetailWithStability(bookID, userID, role)
 	if err != nil {
 		return utils.Error(c, fiber.StatusNotFound, err.Error(), "BOOK_NOT_FOUND", nil)
 	}
 
 	return utils.Success(c, fiber.StatusOK, "book fetched successfully", book, nil)
+}
+
+// GetPublishedBookDetail godoc
+// @Summary Get published book detail
+// @Description Get book detail for a book that must be in published status
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Book}
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /books/published/{id} [get]
+func (h *BookHandler) GetPublishedBookDetail(c *fiber.Ctx) error {
+	bookID := c.Params("id")
+
+	book, err := h.bookSvc.GetPublishedBookDetail(bookID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, err.Error(), "BOOK_NOT_FOUND", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "published book fetched successfully", book, nil)
 }
 
 // UpdateBook godoc
@@ -213,6 +241,66 @@ func (h *BookHandler) RequestPublish(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.StatusOK, "publish request submitted successfully", nil, nil)
 }
 
+// AddPublishedBookToMyBook godoc
+// @Summary Add a published book into my book items
+// @Description Create Item rows for each BookItem in the published book (preparing user memorization items)
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse{data=services.AddPublishedBookToMyBookResult}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /books/published/{id}/add-to-my-books [post]
+func (h *BookHandler) AddPublishedBookToMyBook(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	bookID := c.Params("id")
+
+	result, err := h.bookSvc.AddPublishedBookToMyBook(userID, bookID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_PUBLISHED_BOOK_FAILED", nil)
+	}
+
+	// Invalidate my-items cache so the newly added items show up.
+	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":book")
+	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":all")
+
+	return utils.Success(c, fiber.StatusOK, "published book added to my book successfully", result, nil)
+}
+
+// CopyPublishedBookToDraft godoc
+// @Summary Copy published book to my draft
+// @Description Copy published book structure (modules & items) into a new draft owned by the user
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Published Book ID"
+// @Param request body CopyPublishedBookToDraftRequest true "Copy request"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Book}
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /books/published/{id}/copy-to-draft [post]
+func (h *BookHandler) CopyPublishedBookToDraft(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	publishedBookID := c.Params("id")
+
+	var req CopyPublishedBookToDraftRequest
+	if err := c.BodyParser(&req); err != nil {
+		// Body can be empty; BodyParser fails for empty body in some cases.
+		// Treat empty body as default values (use source book values).
+		req = CopyPublishedBookToDraftRequest{}
+	}
+
+	book, err := h.bookSvc.CopyPublishedBookToDraft(userID, publishedBookID, req.Title, req.Description, req.CoverImage)
+	if err != nil {
+		// If the service says "book not found"/invalid status, treat as 404/400.
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "COPY_PUBLISHED_BOOK_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "published book copied to draft successfully", book, nil)
+}
+
 // ==================== ADMIN ENDPOINTS ====================
 
 // GetPendingBooks godoc
@@ -254,6 +342,9 @@ func (h *BookHandler) ApproveBook(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "APPROVE_BOOK_FAILED", nil)
 	}
 
+	// Invalidate published books cache
+	h.cache.Delete(c.Context(), "books:published")
+
 	return utils.Success(c, fiber.StatusOK, "book approved successfully", nil, nil)
 }
 
@@ -277,6 +368,53 @@ func (h *BookHandler) RejectBook(c *fiber.Ctx) error {
 	}
 
 	return utils.Success(c, fiber.StatusOK, "book rejected successfully", nil, nil)
+}
+
+// DeletePublishedBook godoc
+// @Summary Delete published book (Admin)
+// @Description Delete a published book and all its modules/items
+// @Tags Book Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/books/{id} [delete]
+func (h *BookHandler) DeletePublishedBook(c *fiber.Ctx) error {
+	bookID := c.Params("id")
+
+	if err := h.bookSvc.DeletePublishedBook(bookID); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DELETE_BOOK_FAILED", nil)
+	}
+
+	// Invalidate published books cache
+	h.cache.Delete(c.Context(), "books:published")
+
+	return utils.Success(c, fiber.StatusOK, "book deleted successfully", nil, nil)
+}
+
+// GetBookDetailForAdmin godoc
+// @Summary Get book detail (Admin)
+// @Description Get any user's book detail with modules and items (Admin only)
+// @Tags Book Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse{data=entities.Book}
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /admin/books/{id} [get]
+func (h *BookHandler) GetBookDetailForAdmin(c *fiber.Ctx) error {
+	bookID := c.Params("id")
+
+	book, err := h.bookSvc.GetBookDetailForAdmin(bookID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, err.Error(), "BOOK_NOT_FOUND", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "book fetched successfully", book, nil)
 }
 
 // ==================== MODULE ENDPOINTS ====================
@@ -339,6 +477,7 @@ func (h *BookHandler) AddModule(c *fiber.Ctx) error {
 func (h *BookHandler) GetBookTree(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 	userIDInterface := c.Locals("user_id")
+	userRole := c.Locals("role")
 
 	var userID *uuid.UUID
 	if userIDInterface != nil {
@@ -346,7 +485,12 @@ func (h *BookHandler) GetBookTree(c *fiber.Ctx) error {
 		userID = &id
 	}
 
-	tree, err := h.bookSvc.GetBookTree(bookID, userID)
+	var role string
+	if userRole != nil {
+		role = userRole.(string)
+	}
+
+	tree, err := h.bookSvc.GetBookTree(bookID, userID, role)
 	if err != nil {
 		return utils.Error(c, fiber.StatusNotFound, err.Error(), "BOOK_NOT_FOUND", nil)
 	}
@@ -573,6 +717,12 @@ type AddModuleRequest struct {
 	ParentID    string `json:"parent_id,omitempty" example:""`
 }
 
+type CopyPublishedBookToDraftRequest struct {
+	Title       string `json:"title,omitempty" example:"Belajar Tajwid (Copy)"`
+	Description string `json:"description,omitempty" example:"Panduan belajar tajwid (versi draft)"`
+	CoverImage  string `json:"cover_image,omitempty" example:"https://example.com/cover.jpg"`
+}
+
 // UpdateModuleRequest represents update module request
 type UpdateModuleRequest struct {
 	Title       string `json:"title" example:"Bab 1: Intro"`
@@ -634,4 +784,53 @@ func (h *BookHandler) StartMemorization(c *fiber.Ctx) error {
 	}
 
 	return utils.Success(c, fiber.StatusOK, "Item memorization started", result, nil)
+}
+
+// ==================== MY BOOK COLLECTION ====================
+
+// GetMyBookCollection godoc
+// @Summary Get my book collection
+// @Description Get all published books added to user's collection (read-only books from other users)
+// @Tags My Book Collection
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} utils.SuccessResponse{data=[]services.BookCollectionItem}
+// @Failure 500 {object} utils.ErrorResponse
+// @Router /books/my-collection [get]
+func (h *BookHandler) GetMyBookCollection(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+
+	books, err := h.bookSvc.GetMyBookCollection(userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_COLLECTION_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "book collection fetched successfully", books, nil)
+}
+
+// RemoveFromMyBookCollection godoc
+// @Summary Remove book from my collection
+// @Description Remove a book from user's collection (deletes all memorization items from that book)
+// @Tags My Book Collection
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /books/my-collection/{id} [delete]
+func (h *BookHandler) RemoveFromMyBookCollection(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	bookID := c.Params("id")
+
+	if err := h.bookSvc.RemoveFromMyBookCollection(userID, bookID); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REMOVE_FROM_COLLECTION_FAILED", nil)
+	}
+
+	// Invalidate cache
+	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":book")
+	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":all")
+
+	return utils.Success(c, fiber.StatusOK, "book removed from collection successfully", nil, nil)
 }

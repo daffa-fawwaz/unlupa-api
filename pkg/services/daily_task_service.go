@@ -78,13 +78,23 @@ func (s *dailyTaskService) GenerateToday(
 	limit int,
 ) ([]entities.DailyTask, error) {
 
-	// 📌 SNAPSHOT DATE (WAJIB)
-	taskDate := now.Truncate(24 * time.Hour)
+	// Use local calendar day boundary, not UTC truncation.
+	taskDate := utils.NormalizeDate(now)
+
+	// ========== 0️⃣ Auto-transition for Book Items (START → FSRS_ACTIVE) ==========
+	// Book items in 'start' status automatically transition to 'fsrs_active' after first review
+	// This is handled in ReviewItem, but we also need to handle items that were never reviewed
+	// For now, book items stay in 'start' until user does first review
 
 	// ========== 0️⃣ Auto-graduation for FSRS items ==========
+	// Quran items: by days
 	eligibleItemsByDays, err := s.itemRepo.FindEligibleForGraduation(userID, entities.GraduationIntervalDays, now)
 	if err == nil {
 		for _, item := range eligibleItemsByDays {
+			// Skip book items - they have different graduation logic
+			if item.SourceType == "book" {
+				continue
+			}
 			if s.isUserInQuranClass(userID) {
 				item.Status = entities.ItemStatusPendingGraduate
 			} else {
@@ -96,9 +106,14 @@ func (s *dailyTaskService) GenerateToday(
 			s.itemRepo.Update(&item)
 		}
 	}
+	// Quran items: by stability
 	eligibleItemsByStab, err := s.itemRepo.FindEligibleForGraduationByStability(userID, entities.GraduateStabilityThreshold)
 	if err == nil {
 		for _, item := range eligibleItemsByStab {
+			// Skip book items - they have different graduation logic
+			if item.SourceType == "book" {
+				continue
+			}
 			if s.isUserInQuranClass(userID) {
 				item.Status = entities.ItemStatusPendingGraduate
 			} else {
@@ -177,19 +192,25 @@ func (s *dailyTaskService) GenerateToday(
 	}
 
 	// ========== 2️⃣ Items FSRS Active yang due untuk review ==========
+	// Note: Book items that are graduate will NOT appear here (no NextReviewAt)
 	fsrsItems, err := s.itemRepo.FindFSRSDueItems(userID, now)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, item := range fsrsItems {
+		// Skip book items that are graduate (they don't need review)
+		if item.SourceType == "book" && item.Status == entities.ItemStatusGraduate {
+			continue
+		}
+
 		tasks = append(tasks, entities.DailyTask{
 			ID:        uuid.New(),
 			UserID:    userID,
 			ItemID:    item.ID,
 			CardID:    uuid.Nil, // Item-based, no card
 			TaskDate:  taskDate,
-			Source:    "quran", // or item.SourceType
+			Source:    item.SourceType, // Use actual source type (quran | book)
 			State:     "pending",
 			CreatedAt: now,
 		})

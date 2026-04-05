@@ -30,7 +30,9 @@ func AdminRoutes(
 
 	// Book approval endpoints
 	admin.Get("/books/pending", bookHandler.GetPendingBooks)
+	admin.Get("/books/:id", bookHandler.GetBookDetailForAdmin)
 	admin.Post("/books/:id/approve", bookHandler.ApproveBook)
 	admin.Post("/books/:id/reject", bookHandler.RejectBook)
+	admin.Delete("/books/:id", bookHandler.DeletePublishedBook)
 }
 

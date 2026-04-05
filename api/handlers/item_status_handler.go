@@ -305,7 +305,7 @@ func (h *ItemStatusHandler) GetIntervalStats(c *fiber.Ctx) error {
 
 // ActivateToFSRS godoc
 // @Summary Activate item to FSRS phase
-// @Description Move item from interval to fsrs_active phase (user decision)
+// @Description Move item from interval to fsrs_active phase (user decision). For book items: moves from 'start' to 'fsrs_active'.
 // @Tags Item Status
 // @Accept json
 // @Produce json

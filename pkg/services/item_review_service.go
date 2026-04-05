@@ -87,8 +87,11 @@ func (s *ItemReviewService) ReviewItem(
 	}
 
 	// 3. Validate status - must be fsrs_active or graduate (for periodic review)
+	// For book items: can also be 'start' or 'menghafal'
 	if item.Status != entities.ItemStatusFSRSActive && item.Status != entities.ItemStatusGraduate {
-		return nil, errors.New("item must be in 'fsrs_active' or 'graduate' status to review")
+		if item.SourceType != "book" || (item.Status != entities.ItemStatusStart && item.Status != entities.ItemStatusMenghafal) {
+			return nil, errors.New("item must be in 'fsrs_active' or 'graduate' status to review")
+		}
 	}
 
 	// 4. Validate rating
@@ -160,23 +163,45 @@ func (s *ItemReviewService) ReviewItem(
 	// Kriteria: (hari di fsrs_active >= 30) ATAU (stability >= threshold)
 	graduated := false
 	pendingGraduate := false
-	if item.Status == entities.ItemStatusFSRSActive {
-
-		// Calculate how many days the item has been in fsrs_active phase
-		// FSRSStartAt = when item entered fsrs_active (day 1)
+	
+	// Handle book items: START → FSRS_ACTIVE → GRADUATE
+	if item.SourceType == "book" {
+		// Transition from start/menghafal to fsrs_active on first review
+		if item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal {
+			item.Status = entities.ItemStatusFSRSActive
+			if item.FSRSStartAt == nil {
+				item.FSRSStartAt = &now
+			}
+		}
+		
+		// Check for graduation (book items graduate faster - no teacher approval needed)
+		if item.Status == entities.ItemStatusFSRSActive {
+			daysInFSRSActive := 0
+			if item.FSRSStartAt != nil {
+				daysInFSRSActive = int(now.Sub(*item.FSRSStartAt).Hours() / 24)
+			}
+			
+			// Book items: graduate after 30 days OR stability >= 30, with minimum 5 reviews
+			minReviews := 5
+			thresholdMet := daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold
+			if thresholdMet && item.ReviewCount >= minReviews {
+				item.Status = entities.ItemStatusGraduate
+				item.NextReviewAt = nil // Book items: no review after graduation
+				graduated = true
+			}
+		}
+	} else if item.Status == entities.ItemStatusFSRSActive {
+		// Quran items logic (existing)
 		daysInFSRSActive := 0
 		if item.FSRSStartAt != nil {
 			daysInFSRSActive = int(now.Sub(*item.FSRSStartAt).Hours() / 24)
 		} else if item.IntervalEndAt != nil {
-			// Fallback for legacy records
 			daysInFSRSActive = int(now.Sub(*item.IntervalEndAt).Hours() / 24)
 		}
 
-		// Graduate if threshold met and minimal review count terpenuhi
 		minReviews := 5
 		thresholdMet := daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold
 		if thresholdMet && item.ReviewCount >= minReviews {
-			// Quran items in class may require approval
 			if item.SourceType == "quran" {
 				if s.isUserInQuranClass(userID) {
 					item.Status = entities.ItemStatusPendingGraduate
@@ -186,7 +211,6 @@ func (s *ItemReviewService) ReviewItem(
 					graduated = true
 				}
 			} else {
-				// Book and other items: graduate directly
 				item.Status = entities.ItemStatusGraduate
 				graduated = true
 			}

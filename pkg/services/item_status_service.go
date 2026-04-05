@@ -234,6 +234,7 @@ func (s *ItemStatusService) GetIntervalReviewStats(itemID uuid.UUID, userID uuid
 }
 
 // ActivateToFSRS moves item from interval → fsrs_active (user decision)
+// Also supports book items from 'start' status → fsrs_active
 func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
 	item, err := s.itemRepo.GetByID(itemID)
 	if err != nil {
@@ -244,7 +245,10 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 		return nil, errors.New("unauthorized")
 	}
 
-	if item.Status != entities.ItemStatusInterval {
+	// For book items: allow activation from 'start' status
+	if item.SourceType == "book" && item.Status == entities.ItemStatusStart {
+		// Book items can activate to FSRS directly
+	} else if item.Status != entities.ItemStatusInterval {
 		return nil, errors.New("item must be in 'interval' status to activate FSRS")
 	}
 

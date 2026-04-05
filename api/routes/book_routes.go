@@ -20,6 +20,14 @@ func RegisterBookRoutes(
 	books.Post("/", bookHandler.CreateBook)
 	books.Get("/", bookHandler.GetMyBooks)
 	books.Get("/published", bookHandler.GetPublishedBooks)
+	books.Get("/published/:id", bookHandler.GetPublishedBookDetail)
+	books.Post("/published/:id/add-to-my-books", bookHandler.AddPublishedBookToMyBook)
+	books.Post("/published/:id/copy-to-draft", bookHandler.CopyPublishedBookToDraft)
+	
+	// My Book Collection
+	books.Get("/my-collection", bookHandler.GetMyBookCollection)
+	books.Delete("/my-collection/:id", bookHandler.RemoveFromMyBookCollection)
+	
 	books.Get("/:id/tree", bookHandler.GetBookTree)
 
 	// Module static paths (before dynamic /:id)
