@@ -122,6 +122,13 @@ func (r *ItemRepository) FindByOwnerAndContentRef(ownerID uuid.UUID, contentRef 
 	return items, err
 }
 
+// FindByContentRef finds items by content_ref (across all owners)
+func (r *ItemRepository) FindByContentRef(contentRef string) ([]entities.Item, error) {
+	var items []entities.Item
+	err := r.db.Where("content_ref = ?", contentRef).Find(&items).Error
+	return items, err
+}
+
 // FindByIDs finds items by a list of IDs
 func (r *ItemRepository) FindByIDs(ids []uuid.UUID) ([]entities.Item, error) {
 	var items []entities.Item
