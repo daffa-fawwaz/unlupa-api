@@ -858,7 +858,22 @@ func (s *bookService) DeleteModule(moduleID string, ownerID uuid.UUID) error {
 		return errors.New("cannot delete module from published book")
 	}
 
-	// Delete all items in this module
+	// Get all BookItems in this module to find their Item entities
+	bookItems, err := s.bookItemRepo.FindByModuleID(moduleID)
+	if err == nil && len(bookItems) > 0 {
+		// Delete Item entities for each BookItem
+		for _, bookItem := range bookItems {
+			contentRef := "book:" + bookItem.BookID.String() + ":item:" + bookItem.ID.String()
+			existingItems, err := s.itemRepo.FindByContentRef(contentRef)
+			if err == nil && len(existingItems) > 0 {
+				for _, existingItem := range existingItems {
+					s.itemRepo.DeleteByID(existingItem.ID)
+				}
+			}
+		}
+	}
+
+	// Delete all BookItems in this module
 	if err := s.bookItemRepo.DeleteByModuleID(moduleID); err != nil {
 		return err
 	}
@@ -988,6 +1003,18 @@ func (s *bookService) DeleteItem(itemID string, ownerID uuid.UUID) error {
 
 	if book.Status == entities.BookStatusPublished {
 		return errors.New("cannot delete item from published book")
+	}
+
+	// Delete Item entity if it exists (user already started memorizing this item)
+	contentRef := "book:" + item.BookID.String() + ":item:" + itemID
+	existingItems, err := s.itemRepo.FindByContentRef(contentRef)
+	if err == nil && len(existingItems) > 0 {
+		for _, existingItem := range existingItems {
+			if err := s.itemRepo.DeleteByID(existingItem.ID); err != nil {
+				// Log error but continue with BookItem deletion
+				// This ensures BookItem is deleted even if Item deletion fails
+			}
+		}
 	}
 
 	return s.bookItemRepo.Delete(itemID)
