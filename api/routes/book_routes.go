@@ -29,6 +29,8 @@ func RegisterBookRoutes(
 	books.Delete("/my-collection/:id", bookHandler.RemoveFromMyBookCollection)
 	
 	books.Get("/:id/tree", bookHandler.GetBookTree)
+	books.Post("/:id/request-update", bookHandler.RequestBookUpdate)
+	books.Get("/:id/update-requests", bookHandler.GetBookUpdateRequests)
 
 	// Module static paths (before dynamic /:id)
 	books.Put("/modules/:id", bookHandler.UpdateModule)
