@@ -66,6 +66,7 @@ func ConnectDatabase() {
 		&entities.BookItem{},
 		&entities.ClassBook{},
 		&entities.IntervalReviewLog{},
+		&entities.BookUpdateRequest{},
 
 	)
 	if err != nil {

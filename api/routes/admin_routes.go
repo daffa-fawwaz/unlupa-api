@@ -34,5 +34,10 @@ func AdminRoutes(
 	admin.Post("/books/:id/approve", bookHandler.ApproveBook)
 	admin.Post("/books/:id/reject", bookHandler.RejectBook)
 	admin.Delete("/books/:id", bookHandler.DeletePublishedBook)
+
+	// Book update request endpoints
+	admin.Get("/book-updates/pending", bookHandler.GetPendingBookUpdates)
+	admin.Post("/book-updates/:id/approve", bookHandler.ApproveBookUpdate)
+	admin.Post("/book-updates/:id/reject", bookHandler.RejectBookUpdate)
 }
 

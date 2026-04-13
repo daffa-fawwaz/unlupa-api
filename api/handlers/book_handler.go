@@ -370,6 +370,81 @@ func (h *BookHandler) RejectBook(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.StatusOK, "book rejected successfully", nil, nil)
 }
 
+// GetPendingBookUpdates godoc
+// @Summary Get pending book updates (Admin)
+// @Description Get all pending book update requests
+// @Tags Book Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} utils.SuccessResponse{data=[]entities.BookUpdateRequest}
+// @Failure 403 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
+// @Router /admin/book-updates/pending [get]
+func (h *BookHandler) GetPendingBookUpdates(c *fiber.Ctx) error {
+	requests, err := h.bookSvc.GetPendingBookUpdates()
+	if err != nil {
+		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_PENDING_UPDATES_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "pending update requests fetched successfully", requests, nil)
+}
+
+// ApproveBookUpdate godoc
+// @Summary Approve book update (Admin)
+// @Description Approve a pending book update request
+// @Tags Book Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Update Request ID"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/book-updates/{id}/approve [post]
+func (h *BookHandler) ApproveBookUpdate(c *fiber.Ctx) error {
+	adminID := c.Locals("user_id").(uuid.UUID)
+	requestID := c.Params("id")
+
+	if err := h.bookSvc.ApproveBookUpdate(requestID, adminID); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "APPROVE_UPDATE_FAILED", nil)
+	}
+
+	// Invalidate published books cache
+	h.cache.Delete(c.Context(), "books:published")
+
+	return utils.Success(c, fiber.StatusOK, "book update approved successfully", nil, nil)
+}
+
+// RejectBookUpdate godoc
+// @Summary Reject book update (Admin)
+// @Description Reject a pending book update request
+// @Tags Book Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Update Request ID"
+// @Param request body RejectBookUpdateRequest true "Reject request"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 403 {object} utils.ErrorResponse
+// @Router /admin/book-updates/{id}/reject [post]
+func (h *BookHandler) RejectBookUpdate(c *fiber.Ctx) error {
+	adminID := c.Locals("user_id").(uuid.UUID)
+	requestID := c.Params("id")
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.BodyParser(&req) // Body is optional
+
+	if err := h.bookSvc.RejectBookUpdate(requestID, adminID, req.Reason); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REJECT_UPDATE_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "book update rejected successfully", nil, nil)
+}
+
 // DeletePublishedBook godoc
 // @Summary Delete published book (Admin)
 // @Description Delete a published book and all its modules/items
@@ -393,6 +468,62 @@ func (h *BookHandler) DeletePublishedBook(c *fiber.Ctx) error {
 	h.cache.Delete(c.Context(), "books:published")
 
 	return utils.Success(c, fiber.StatusOK, "book deleted successfully", nil, nil)
+}
+
+// RequestBookUpdate godoc
+// @Summary Request book update (Owner)
+// @Description Request an update for a published book (requires admin approval)
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Param request body RequestBookUpdateRequest true "Update request"
+// @Success 200 {object} utils.SuccessResponse{data=entities.BookUpdateRequest}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /books/{id}/request-update [post]
+func (h *BookHandler) RequestBookUpdate(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	bookID := c.Params("id")
+
+	var req struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		CoverImage  string `json:"cover_image"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	}
+
+	updateReq, err := h.bookSvc.RequestBookUpdate(bookID, userID, req.Title, req.Description, req.CoverImage)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REQUEST_UPDATE_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "update request submitted successfully", updateReq, nil)
+}
+
+// GetBookUpdateRequests godoc
+// @Summary Get book update requests
+// @Description Get all update requests for a book
+// @Tags Book
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Success 200 {object} utils.SuccessResponse{data=[]entities.BookUpdateRequest}
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /books/{id}/update-requests [get]
+func (h *BookHandler) GetBookUpdateRequests(c *fiber.Ctx) error {
+	bookID := c.Params("id")
+
+	requests, err := h.bookSvc.GetBookUpdateRequests(bookID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusNotFound, err.Error(), "GET_UPDATE_REQUESTS_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "update requests fetched successfully", requests, nil)
 }
 
 // GetBookDetailForAdmin godoc
@@ -707,6 +838,18 @@ type UpdateBookRequest struct {
 	Title       string `json:"title" example:"Belajar Tajwid Lengkap"`
 	Description string `json:"description" example:"Panduan lengkap"`
 	CoverImage  string `json:"cover_image" example:"https://example.com/cover2.jpg"`
+}
+
+// RequestBookUpdateRequest represents request book update request
+type RequestBookUpdateRequest struct {
+	Title       string `json:"title" example:"Belajar Tajwid Lengkap v2"`
+	Description string `json:"description" example:"Updated description"`
+	CoverImage  string `json:"cover_image" example:"https://example.com/cover2.jpg"`
+}
+
+// RejectBookUpdateRequest represents reject book update request
+type RejectBookUpdateRequest struct {
+	Reason string `json:"reason" example:"Content needs revision"`
 }
 
 // AddModuleRequest represents add module request

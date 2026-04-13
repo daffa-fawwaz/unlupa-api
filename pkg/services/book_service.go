@@ -32,6 +32,13 @@ type BookService interface {
 	RejectBook(bookID string) error
 	DeletePublishedBook(bookID string) error
 
+	// Book update requests (for published books)
+	RequestBookUpdate(bookID string, ownerID uuid.UUID, title, description, coverImage string) (*entities.BookUpdateRequest, error)
+	GetBookUpdateRequests(bookID string) ([]entities.BookUpdateRequest, error)
+	ApproveBookUpdate(requestID string, adminID uuid.UUID) error
+	RejectBookUpdate(requestID string, adminID uuid.UUID, reason string) error
+	GetPendingBookUpdates() ([]entities.BookUpdateRequest, error)
+
 	// Module CRUD
 	AddModule(bookID string, ownerID uuid.UUID, title, description string, order int, parentID *uuid.UUID) (*entities.BookModule, error)
 	UpdateModule(moduleID string, ownerID uuid.UUID, title, description string, order int) (*entities.BookModule, error)
@@ -153,11 +160,12 @@ type BookCollectionItem struct {
 }
 
 type bookService struct {
-	bookRepo       repositories.BookRepository
-	bookModuleRepo repositories.BookModuleRepository
-	bookItemRepo   repositories.BookItemRepository
-	itemRepo       *repositories.ItemRepository
-	userRepo       repositories.UserRepository
+	bookRepo               repositories.BookRepository
+	bookModuleRepo         repositories.BookModuleRepository
+	bookItemRepo           repositories.BookItemRepository
+	itemRepo               *repositories.ItemRepository
+	userRepo               repositories.UserRepository
+	updateRequestRepo      *repositories.BookUpdateRequestRepository
 }
 
 func NewBookService(
@@ -166,13 +174,15 @@ func NewBookService(
 	bookItemRepo repositories.BookItemRepository,
 	itemRepo *repositories.ItemRepository,
 	userRepo repositories.UserRepository,
+	updateRequestRepo *repositories.BookUpdateRequestRepository,
 ) BookService {
 	return &bookService{
-		bookRepo:       bookRepo,
-		bookModuleRepo: bookModuleRepo,
-		bookItemRepo:   bookItemRepo,
-		itemRepo:       itemRepo,
-		userRepo:       userRepo,
+		bookRepo:               bookRepo,
+		bookModuleRepo:         bookModuleRepo,
+		bookItemRepo:           bookItemRepo,
+		itemRepo:               itemRepo,
+		userRepo:               userRepo,
+		updateRequestRepo:      updateRequestRepo,
 	}
 }
 
@@ -651,8 +661,40 @@ func (s *bookService) UpdateBook(bookID string, ownerID uuid.UUID, title, descri
 		return nil, errors.New("you don't have permission to update this book")
 	}
 
+	// For published books, create an update request instead of direct update
 	if book.Status == entities.BookStatusPublished {
-		return nil, errors.New("cannot update published book")
+		// Check if there's already a pending update request
+		existingPending, err := s.updateRequestRepo.FindPendingByBookID(bookID)
+		if err == nil && existingPending != nil {
+			// Update the existing pending request
+			if title != "" {
+				existingPending.Title = title
+			}
+			if description != "" {
+				existingPending.Description = description
+			}
+			if coverImage != "" {
+				existingPending.CoverImage = coverImage
+			}
+			if err := s.updateRequestRepo.Update(existingPending); err != nil {
+				return nil, err
+			}
+			return book, nil
+		}
+
+		// Create new update request
+		updateReq := &entities.BookUpdateRequest{
+			BookID:      uuid.MustParse(bookID),
+			OwnerID:     ownerID,
+			Title:       title,
+			Description: description,
+			CoverImage:  coverImage,
+			Status:      entities.BookUpdateStatusPending,
+		}
+		if err := s.updateRequestRepo.Create(updateReq); err != nil {
+			return nil, err
+		}
+		return book, nil
 	}
 
 	if title != "" {
@@ -768,6 +810,116 @@ func (s *bookService) DeletePublishedBook(bookID string) error {
 	return s.bookRepo.Delete(bookID)
 }
 
+// ==================== BOOK UPDATE REQUESTS ====================
+
+// RequestBookUpdate creates an update request for a published book
+func (s *bookService) RequestBookUpdate(bookID string, ownerID uuid.UUID, title, description, coverImage string) (*entities.BookUpdateRequest, error) {
+	book, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	if book.OwnerID != ownerID {
+		return nil, errors.New("you don't have permission to update this book")
+	}
+
+	if book.Status != entities.BookStatusPublished {
+		return nil, errors.New("book must be published to request update")
+	}
+
+	// Check if there's already a pending update request
+	existingPending, err := s.updateRequestRepo.FindPendingByBookID(bookID)
+	if err == nil && existingPending != nil {
+		return nil, errors.New("there is already a pending update request for this book")
+	}
+
+	updateReq := &entities.BookUpdateRequest{
+		BookID:      uuid.MustParse(bookID),
+		OwnerID:     ownerID,
+		Title:       title,
+		Description: description,
+		CoverImage:  coverImage,
+		Status:      entities.BookUpdateStatusPending,
+	}
+
+	if err := s.updateRequestRepo.Create(updateReq); err != nil {
+		return nil, err
+	}
+
+	return updateReq, nil
+}
+
+// GetBookUpdateRequests returns all update requests for a book
+func (s *bookService) GetBookUpdateRequests(bookID string) ([]entities.BookUpdateRequest, error) {
+	return s.updateRequestRepo.FindByBookID(bookID)
+}
+
+// ApproveBookUpdate approves an update request and applies changes to the book
+func (s *bookService) ApproveBookUpdate(requestID string, adminID uuid.UUID) error {
+	updateReq, err := s.updateRequestRepo.FindByID(requestID)
+	if err != nil {
+		return errors.New("update request not found")
+	}
+
+	if updateReq.Status != entities.BookUpdateStatusPending {
+		return errors.New("update request is not pending")
+	}
+
+	// Get the book
+	book, err := s.bookRepo.FindByID(updateReq.BookID.String())
+	if err != nil {
+		return errors.New("book not found")
+	}
+
+	// Apply changes to the book
+	if updateReq.Title != "" {
+		book.Title = updateReq.Title
+	}
+	if updateReq.Description != "" {
+		book.Description = updateReq.Description
+	}
+	if updateReq.CoverImage != "" {
+		book.CoverImage = updateReq.CoverImage
+	}
+
+	now := time.Now()
+	updateReq.Status = entities.BookUpdateStatusApproved
+	updateReq.ApprovedAt = &now
+	updateReq.ApprovedBy = &adminID
+
+	// Update both the book and the request
+	if err := s.bookRepo.Update(book); err != nil {
+		return err
+	}
+
+	return s.updateRequestRepo.Update(updateReq)
+}
+
+// RejectBookUpdate rejects an update request
+func (s *bookService) RejectBookUpdate(requestID string, adminID uuid.UUID, reason string) error {
+	updateReq, err := s.updateRequestRepo.FindByID(requestID)
+	if err != nil {
+		return errors.New("update request not found")
+	}
+
+	if updateReq.Status != entities.BookUpdateStatusPending {
+		return errors.New("update request is not pending")
+	}
+
+	now := time.Now()
+	updateReq.Status = entities.BookUpdateStatusRejected
+	updateReq.ApprovedAt = &now
+	updateReq.ApprovedBy = &adminID
+	updateReq.RejectReason = reason
+
+	return s.updateRequestRepo.Update(updateReq)
+}
+
+// GetPendingBookUpdates returns all pending update requests
+func (s *bookService) GetPendingBookUpdates() ([]entities.BookUpdateRequest, error) {
+	return s.updateRequestRepo.FindAllPending()
+}
+
 // ==================== MODULE CRUD ====================
 
 func (s *bookService) AddModule(bookID string, ownerID uuid.UUID, title, description string, order int, parentID *uuid.UUID) (*entities.BookModule, error) {
@@ -780,10 +932,8 @@ func (s *bookService) AddModule(bookID string, ownerID uuid.UUID, title, descrip
 		return nil, errors.New("you don't have permission to add module to this book")
 	}
 
-	if book.Status == entities.BookStatusPublished {
-		return nil, errors.New("cannot add module to published book")
-	}
-
+	// Allow owner to add modules to published books
+	// (Changes are visible immediately, but owner should request update for metadata)
 	if title == "" {
 		return nil, errors.New("module title is required")
 	}
@@ -893,10 +1043,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		return nil, errors.New("you don't have permission to add item to this book")
 	}
 
-	if book.Status == entities.BookStatusPublished {
-		return nil, errors.New("cannot add item to published book")
-	}
-
+	// Allow owner to add items to published books
 	// Title is optional, but content or answer must be provided
 	if content == "" && answer == "" {
 		return nil, errors.New("either content or answer must be provided")
