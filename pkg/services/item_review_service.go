@@ -160,11 +160,11 @@ func (s *ItemReviewService) ReviewItem(
 	item.NextReviewAt = &nextReview
 
 	// 12. Check for graduation in fsrs_active
-	// Kriteria: (hari di fsrs_active >= 30) ATAU (stability >= threshold)
+	// Book items: NO auto-graduate, stay in fsrs_active until user deactivates
 	graduated := false
 	pendingGraduate := false
-	
-	// Handle book items: START → FSRS_ACTIVE → GRADUATE
+
+	// Handle book items: START → FSRS_ACTIVE (no auto-graduate)
 	if item.SourceType == "book" {
 		// Transition from start/menghafal to fsrs_active on first review
 		if item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal {
@@ -173,23 +173,7 @@ func (s *ItemReviewService) ReviewItem(
 				item.FSRSStartAt = &now
 			}
 		}
-		
-		// Check for graduation (book items graduate faster - no teacher approval needed)
-		if item.Status == entities.ItemStatusFSRSActive {
-			daysInFSRSActive := 0
-			if item.FSRSStartAt != nil {
-				daysInFSRSActive = int(now.Sub(*item.FSRSStartAt).Hours() / 24)
-			}
-			
-			// Book items: graduate after 30 days OR stability >= 30, with minimum 5 reviews
-			minReviews := 5
-			thresholdMet := daysInFSRSActive >= entities.GraduationIntervalDays || item.Stability >= entities.GraduateStabilityThreshold
-			if thresholdMet && item.ReviewCount >= minReviews {
-				item.Status = entities.ItemStatusGraduate
-				item.NextReviewAt = nil // Book items: no review after graduation
-				graduated = true
-			}
-		}
+		// Book items stay in fsrs_active forever until user deactivates
 	} else if item.Status == entities.ItemStatusFSRSActive {
 		// Quran items logic (existing)
 		daysInFSRSActive := 0
