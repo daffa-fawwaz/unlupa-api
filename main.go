@@ -129,7 +129,7 @@ func main() {
 	// ================= ITEM STATUS =================
 	intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)
 	itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo)
-	itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc, juzItemRepo, bookRepo, bookItemRepo)
+	itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc, juzItemRepo, bookRepo, bookItemRepo, itemRepo)
 
 	// ================= CLASS =================
 	classBookRepo := repositories.NewClassBookRepository(config.DB)

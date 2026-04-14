@@ -16,10 +16,11 @@ type ItemStatusHandler struct {
 	juzItemRepo  *repositories.JuzItemRepository
 	bookRepo     repositories.BookRepository
 	bookItemRepo repositories.BookItemRepository
+	itemRepo     *repositories.ItemRepository
 }
 
-func NewItemStatusHandler(s *services.ItemStatusService, juzItemRepo *repositories.JuzItemRepository, bookRepo repositories.BookRepository, bookItemRepo repositories.BookItemRepository) *ItemStatusHandler {
-	return &ItemStatusHandler{service: s, juzItemRepo: juzItemRepo, bookRepo: bookRepo, bookItemRepo: bookItemRepo}
+func NewItemStatusHandler(s *services.ItemStatusService, juzItemRepo *repositories.JuzItemRepository, bookRepo repositories.BookRepository, bookItemRepo repositories.BookItemRepository, itemRepo *repositories.ItemRepository) *ItemStatusHandler {
+	return &ItemStatusHandler{service: s, juzItemRepo: juzItemRepo, bookRepo: bookRepo, bookItemRepo: bookItemRepo, itemRepo: itemRepo}
 }
 
 // StartIntervalRequest represents start interval request
@@ -379,24 +380,45 @@ func (h *ItemStatusHandler) GetDeadlines(c *fiber.Ctx) error {
 
 // DeactivateItem godoc
 // @Summary Deactivate a book item
-// @Description Move book item from fsrs_active to inactive status. Only for non-quran items.
+// @Description Move book item from fsrs_active to inactive status. Only for non-quran items. Accepts item_id from items table or book_items table.
 // @Tags Item Status
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param item_id path string true "Item ID"
+// @Param item_id path string true "Item ID (from items or book_items table)"
 // @Success 200 {object} utils.SuccessResponse{data=entities.Item}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /items/{item_id}/deactivate [post]
 func (h *ItemStatusHandler) DeactivateItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
-	itemID, err := uuid.Parse(c.Params("item_id"))
+	itemIDStr := c.Params("item_id")
+	
+	itemID, err := uuid.Parse(itemIDStr)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
 	}
 
+	// Try to find in items table first
 	item, err := h.service.DeactivateItem(itemID, userID)
 	if err != nil {
+		// If not found in items table, try book_items table
+		if err.Error() == "item not found" {
+			// Try to find in book_items table
+			bookItem, bookErr := h.bookItemRepo.FindByID(itemIDStr)
+			if bookErr == nil && bookItem != nil {
+				// Find corresponding Item entity using content_ref
+				contentRef := "book:" + bookItem.BookID.String() + ":item:" + bookItem.ID.String()
+				items, findErr := h.itemRepo.FindByOwnerAndContentRef(userID, contentRef)
+				if findErr == nil && len(items) > 0 {
+					// Deactivate the Item entity
+					item, err = h.service.DeactivateItem(items[0].ID, userID)
+					if err != nil {
+						return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DEACTIVATE_FAILED", nil)
+					}
+					return utils.Success(c, fiber.StatusOK, "Item deactivated successfully", item, nil)
+				}
+			}
+		}
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DEACTIVATE_FAILED", nil)
 	}
 
@@ -405,24 +427,45 @@ func (h *ItemStatusHandler) DeactivateItem(c *fiber.Ctx) error {
 
 // ReactivateItem godoc
 // @Summary Reactivate a book item
-// @Description Move book item from inactive back to fsrs_active status. Only for non-quran items.
+// @Description Move book item from inactive back to fsrs_active status. Only for non-quran items. Accepts item_id from items table or book_items table.
 // @Tags Item Status
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param item_id path string true "Item ID"
+// @Param item_id path string true "Item ID (from items or book_items table)"
 // @Success 200 {object} utils.SuccessResponse{data=entities.Item}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /items/{item_id}/reactivate [post]
 func (h *ItemStatusHandler) ReactivateItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
-	itemID, err := uuid.Parse(c.Params("item_id"))
+	itemIDStr := c.Params("item_id")
+	
+	itemID, err := uuid.Parse(itemIDStr)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
 	}
 
+	// Try to find in items table first
 	item, err := h.service.ReactivateItem(itemID, userID)
 	if err != nil {
+		// If not found in items table, try book_items table
+		if err.Error() == "item not found" {
+			// Try to find in book_items table
+			bookItem, bookErr := h.bookItemRepo.FindByID(itemIDStr)
+			if bookErr == nil && bookItem != nil {
+				// Find corresponding Item entity using content_ref
+				contentRef := "book:" + bookItem.BookID.String() + ":item:" + bookItem.ID.String()
+				items, findErr := h.itemRepo.FindByOwnerAndContentRef(userID, contentRef)
+				if findErr == nil && len(items) > 0 {
+					// Reactivate the Item entity
+					item, err = h.service.ReactivateItem(items[0].ID, userID)
+					if err != nil {
+						return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REACTIVATE_FAILED", nil)
+					}
+					return utils.Success(c, fiber.StatusOK, "Item reactivated successfully", item, nil)
+				}
+			}
+		}
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REACTIVATE_FAILED", nil)
 	}
 
