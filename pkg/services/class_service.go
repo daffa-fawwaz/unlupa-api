@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
 
@@ -441,7 +442,7 @@ func (s *classService) JoinClass(userID uuid.UUID, classCode string) (*entities.
 	member := &entities.ClassMember{
 		ClassID:  class.ID,
 		UserID:   userID,
-		JoinedAt: time.Now(),
+		JoinedAt: time.Now().In(config.AppLocation),
 	}
 
 	if err := s.classMemberRepo.Create(member); err != nil {
@@ -631,7 +632,7 @@ func (s *classService) ApproveGraduation(classID string, teacherID uuid.UUID, it
 	}
 
 	// Approve graduation
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	item.Status = entities.ItemStatusGraduate
 	item.ApprovedBy = &teacherID
 	item.ApprovedAt = &now

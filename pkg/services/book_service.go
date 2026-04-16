@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
 
@@ -96,7 +97,7 @@ func calculateStability(item *entities.Item) string {
 
 	// For items in FSRS or other phases with NextReviewAt, calculate days until next review
 	if item.NextReviewAt != nil && item.LastReviewAt != nil {
-		now := time.Now()
+		now := time.Now().In(config.AppLocation)
 		// Calculate days from last review to next review (total interval)
 		totalInterval := item.NextReviewAt.Sub(*item.LastReviewAt).Hours() / 24
 		// Calculate days elapsed since last review
@@ -882,7 +883,7 @@ func (s *bookService) ApproveBookUpdate(requestID string, adminID uuid.UUID) err
 		book.CoverImage = updateReq.CoverImage
 	}
 
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	updateReq.Status = entities.BookUpdateStatusApproved
 	updateReq.ApprovedAt = &now
 	updateReq.ApprovedBy = &adminID
@@ -906,7 +907,7 @@ func (s *bookService) RejectBookUpdate(requestID string, adminID uuid.UUID, reas
 		return errors.New("update request is not pending")
 	}
 
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	updateReq.Status = entities.BookUpdateStatusRejected
 	updateReq.ApprovedAt = &now
 	updateReq.ApprovedBy = &adminID
@@ -1082,8 +1083,8 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		Answer:                 answer,
 		Order:                  order,
 		EstimatedReviewSeconds: estSeconds,
-		CreatedAt:              time.Now(),
-		UpdatedAt:              time.Now(),
+		CreatedAt:              time.Now().In(config.AppLocation),
+		UpdatedAt:              time.Now().In(config.AppLocation),
 	}
 
 	if err := s.bookItemRepo.Create(item); err != nil {
@@ -1124,7 +1125,7 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 	if order > 0 {
 		item.Order = order
 	}
-	item.UpdatedAt = time.Now()
+	item.UpdatedAt = time.Now().In(config.AppLocation)
 
 	if err := s.bookItemRepo.Update(item); err != nil {
 		return nil, err

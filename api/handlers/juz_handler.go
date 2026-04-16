@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hifzhun-api/pkg/cache"
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
@@ -88,7 +89,7 @@ func (h *JuzHandler) Activate(c *fiber.Ctx) error {
 
 	h.invalidateJuzCache(c, userID)
 	// Invalidate today's daily cache so next generate/list reflects change
-	date := time.Now().Format("2006-01-02")
+	date := time.Now().In(config.AppLocation).Format("2006-01-02")
 	h.cache.Delete(c.Context(), fmt.Sprintf("daily:%s:%s", userID.String(), date))
 	return utils.Success(c, fiber.StatusOK, "Juz activated", map[string]any{"index": juzIndex, "active": true}, nil)
 }
@@ -123,7 +124,7 @@ func (h *JuzHandler) Deactivate(c *fiber.Ctx) error {
 
 	h.invalidateJuzCache(c, userID)
 	// Invalidate today's daily cache so next generate/list reflects change
-	date := time.Now().Format("2006-01-02")
+	date := time.Now().In(config.AppLocation).Format("2006-01-02")
 	h.cache.Delete(c.Context(), fmt.Sprintf("daily:%s:%s", userID.String(), date))
 	return utils.Success(c, fiber.StatusOK, "Juz deactivated", map[string]any{"index": juzIndex, "active": false}, nil)
 }
@@ -151,7 +152,7 @@ func (h *JuzHandler) MarkDone(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusNotFound, "Juz not found for user", "JUZ_NOT_FOUND", nil)
 	}
 
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	j.IsDone = true
 	j.DoneAt = &now
 	if err := h.juzRepo.Update(j); err != nil {

@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/services"
 )
 
@@ -51,7 +52,7 @@ func (h *GraduationPreEngineHandler) Decide(c *fiber.Ctx) error {
 		req.ItemID,
 		req.Action,
 		req.Reason,
-		time.Now(),
+		time.Now().In(config.AppLocation),
 	); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
