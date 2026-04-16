@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/services"
 )
 
@@ -54,7 +55,7 @@ func (h *LoadControlHandler) Today(c *fiber.Ctx) error {
 	items, err := h.service.SelectForToday(
 		c.Context(),
 		userID,
-		time.Now(),
+		time.Now().In(config.AppLocation),
 		limit,
 	)
 	if err != nil {

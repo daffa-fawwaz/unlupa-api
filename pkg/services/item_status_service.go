@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
 )
@@ -49,7 +50,7 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 	}
 
 	// Transition to interval with recurring review
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	// Target date (hari + interval)
 	targetDate := now.AddDate(0, 0, intervalDays)
 
@@ -59,7 +60,7 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 		targetDate.Month(),
 		targetDate.Day(),
 		0, 0, 0, 0,
-		targetDate.Location(),
+		config.AppLocation,
 	)
 
 	item.Status = entities.ItemStatusInterval
@@ -93,14 +94,14 @@ func (s *ItemStatusService) UpdateIntervalDays(itemID uuid.UUID, userID uuid.UUI
 		return nil, errors.New("item must be in 'interval' status to change interval_days")
 	}
 
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	targetDate := now.AddDate(0, 0, intervalDays)
 	nextReview := time.Date(
 		targetDate.Year(),
 		targetDate.Month(),
 		targetDate.Day(),
 		0, 0, 0, 0,
-		targetDate.Location(),
+		config.AppLocation,
 	)
 
 	item.IntervalDays = intervalDays
@@ -142,7 +143,7 @@ func (s *ItemStatusService) ReviewInterval(itemID uuid.UUID, userID uuid.UUID, r
 	}
 
 	// Check if review is allowed (now >= interval_next_review_at)
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	if item.IntervalNextReviewAt != nil && now.Before(*item.IntervalNextReviewAt) {
 		return nil, errors.New("review not allowed yet, next review at: " + item.IntervalNextReviewAt.Format("2006-01-02 15:04"))
 	}
@@ -167,7 +168,7 @@ func (s *ItemStatusService) ReviewInterval(itemID uuid.UUID, userID uuid.UUID, r
 		targetDate.Month(),
 		targetDate.Day(),
 		0, 0, 0, 0,
-		targetDate.Location(),
+		config.AppLocation,
 	)
 	item.IntervalNextReviewAt = &nextReview
 	item.ReviewCount++
@@ -252,11 +253,11 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 		return nil, errors.New("item must be in 'interval' status to activate FSRS")
 	}
 
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 
 	// Next review besok 00:00
 	nextDay := now.AddDate(0, 0, 1)
-	nextReview := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, nextDay.Location())
+	nextReview := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, config.AppLocation)
 
 	item.Status = entities.ItemStatusFSRSActive
 	item.IntervalEndAt = &now
@@ -323,7 +324,7 @@ func (s *ItemStatusService) Graduate(item *entities.Item) error {
 
 // GetDeadlineItems returns items that have reached their interval deadline (view only)
 func (s *ItemStatusService) GetDeadlineItems(userID uuid.UUID) ([]entities.Item, error) {
-	now := time.Now()
+	now := time.Now().In(config.AppLocation)
 	allItems, err := s.itemRepo.FindIntervalDeadlineReached(now)
 	if err != nil {
 		return nil, err

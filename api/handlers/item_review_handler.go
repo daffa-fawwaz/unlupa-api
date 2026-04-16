@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"hifzhun-api/pkg/cache"
+	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/fsrs"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
@@ -75,7 +76,7 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 		userID,
 		itemID,
 		fsrs.Rating(req.Rating),
-		time.Now(),
+		time.Now().In(config.AppLocation),
 	)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REVIEW_FAILED", nil)
@@ -106,7 +107,7 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 	ctx := c.Context()
 	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
-	date := time.Now().Format("2006-01-02")
+	date := time.Now().In(config.AppLocation).Format("2006-01-02")
 	h.cache.Delete(ctx, fmt.Sprintf("daily:%s:%s", userID.String(), date))
 
 	return utils.Success(c, fiber.StatusOK, message, resp, nil)
