@@ -98,10 +98,10 @@ func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
-	// Invalidate today's cache so ListToday reflects newly generated tasks
+	// Invalidate today's list cache variants (group="" and group="juz", etc).
 	date := now.Format("2006-01-02")
-	cacheKey := fmt.Sprintf("daily:%s:%s", userID.String(), date)
-	h.cache.Delete(c.Context(), cacheKey)
+	cachePrefix := fmt.Sprintf("daily:%s:%s:", userID.String(), date)
+	h.cache.DeleteByPattern(c.Context(), cachePrefix+"*")
 
 	return c.JSON(fiber.Map{
 		"task_date": date,

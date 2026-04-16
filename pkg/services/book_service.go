@@ -2,6 +2,8 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"hifzhun-api/pkg/entities"
@@ -15,8 +17,11 @@ type BookService interface {
 	CreateBook(ownerID uuid.UUID, title, description, coverImage string) (*entities.Book, error)
 	GetMyBooks(ownerID uuid.UUID) ([]entities.Book, error)
 	GetPublishedBooks() ([]entities.Book, error)
-	GetBookDetail(bookID string, userID *uuid.UUID) (*entities.Book, error)
-	GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeResponse, error)
+	GetPublishedBookDetail(bookID string) (*entities.Book, error)
+	GetBookDetail(bookID string, userID *uuid.UUID, role string) (*entities.Book, error)
+	GetBookDetailWithStability(bookID string, userID *uuid.UUID, role string) (*BookDetailWithStability, error)
+	GetBookDetailForAdmin(bookID string) (*entities.Book, error)
+	GetBookTree(bookID string, userID *uuid.UUID, role string) (*BookTreeResponse, error)
 	UpdateBook(bookID string, ownerID uuid.UUID, title, description, coverImage string) (*entities.Book, error)
 	DeleteBook(bookID string, ownerID uuid.UUID) error
 
@@ -25,6 +30,7 @@ type BookService interface {
 	GetPendingBooks() ([]entities.Book, error)
 	ApproveBook(bookID string) error
 	RejectBook(bookID string) error
+	DeletePublishedBook(bookID string) error
 
 	// Module CRUD
 	AddModule(bookID string, ownerID uuid.UUID, title, description string, order int, parentID *uuid.UUID) (*entities.BookModule, error)
@@ -38,23 +44,85 @@ type BookService interface {
 
 	// Memorization
 	StartItemMemorization(userID uuid.UUID, bookID, bookItemID string) (*StartMemorizationResult, error)
+
+	// Add published book into user's "my book items" (creates Item rows for each BookItem)
+	AddPublishedBookToMyBook(userID uuid.UUID, bookID string) (*AddPublishedBookToMyBookResult, error)
+
+	// Copy published book structure into a new draft owned by the user
+	CopyPublishedBookToDraft(userID uuid.UUID, publishedBookID string, title, description, coverImage string) (*entities.Book, error)
+
+	// My Book Collection
+	GetMyBookCollection(userID uuid.UUID) ([]BookCollectionItem, error)
+	RemoveFromMyBookCollection(userID uuid.UUID, bookID string) error
+}
+
+// BookItemWithStability represents a BookItem with stability information
+type BookItemWithStability struct {
+	entities.BookItem
+	Stability string `json:"stability"` // "item belum masuk ujian" or days until next review
+}
+
+// BookDetailWithStability represents book detail with stability information for items
+type BookDetailWithStability struct {
+	entities.Book
+	Items   []BookItemWithStability `json:"items"`
+	Modules []ModuleWithStability   `json:"modules"`
+}
+
+type ModuleWithStability struct {
+	entities.BookModule
+	Items    []BookItemWithStability `json:"items"`
+	Children []ModuleWithStability   `json:"children"`
+}
+
+// calculateStability calculates stability based on Item status and review dates
+// Returns "item belum masuk ujian" if status is start or no review data, otherwise calculates days until next review
+func calculateStability(item *entities.Item) string {
+	if item == nil {
+		return "item belum masuk ujian"
+	}
+
+	// If status is start, item hasn't entered FSRS phase yet
+	if item.Status == entities.ItemStatusStart {
+		return "item belum masuk ujian"
+	}
+
+	// For items in FSRS or other phases with NextReviewAt, calculate days until next review
+	if item.NextReviewAt != nil && item.LastReviewAt != nil {
+		now := time.Now()
+		// Calculate days from last review to next review (total interval)
+		totalInterval := item.NextReviewAt.Sub(*item.LastReviewAt).Hours() / 24
+		// Calculate days elapsed since last review
+		elapsed := now.Sub(*item.LastReviewAt).Hours() / 24
+		// Calculate remaining days until next review
+		remaining := totalInterval - elapsed
+		
+		if remaining < 0 {
+			remaining = 0
+		}
+		
+		// Return as string representation of integer days
+		return fmt.Sprintf("%.0f", remaining)
+	}
+
+	return "item belum masuk ujian"
 }
 
 // BookTreeResponse represents hierarchical modules and items for a book
 type BookTreeResponse struct {
-	BookID  string              `json:"book_id"`
-	Title   string              `json:"title"`
-	Items   []entities.BookItem `json:"items"` // items directly under book
-	Modules []ModuleNode        `json:"modules"`
+	BookID  string                 `json:"book_id"`
+	Title   string                 `json:"title"`
+	Items   []BookItemWithStability `json:"items"` // items directly under book
+	Modules []ModuleNodeWithItems  `json:"modules"`
 }
 
-type ModuleNode struct {
-	ID          string              `json:"id"`
-	Title       string              `json:"title"`
-	Description string              `json:"description"`
-	Order       int                 `json:"order"`
-	Items       []entities.BookItem `json:"items"`
-	Children    []ModuleNode        `json:"children"`
+type ModuleNodeWithItems struct {
+	ID          string                 `json:"id"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Order       int                    `json:"order"`
+	Items       []BookItemWithStability `json:"items"`
+	Children    []ModuleNodeWithItems  `json:"children"`
 }
 
 // StartMemorizationResult represents the result of starting book item memorization
@@ -66,11 +134,30 @@ type StartMemorizationResult struct {
 	Status     string    `json:"status"`
 }
 
+type AddPublishedBookToMyBookResult struct {
+	BookID           string   `json:"book_id"`
+	AddedCount       int      `json:"added_count"`
+	SkippedCount     int      `json:"skipped_count"`
+	AddedContentRefs []string `json:"added_content_refs,omitempty"`
+}
+
+// BookCollectionItem represents a book in user's collection
+type BookCollectionItem struct {
+	BookID        string    `json:"book_id"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	CoverImage    string    `json:"cover_image,omitempty"`
+	OwnerName     string    `json:"owner_name,omitempty"`
+	ItemCount     int       `json:"item_count"`
+	AddedAt       string    `json:"added_at"`
+}
+
 type bookService struct {
 	bookRepo       repositories.BookRepository
 	bookModuleRepo repositories.BookModuleRepository
 	bookItemRepo   repositories.BookItemRepository
 	itemRepo       *repositories.ItemRepository
+	userRepo       repositories.UserRepository
 }
 
 func NewBookService(
@@ -78,12 +165,14 @@ func NewBookService(
 	bookModuleRepo repositories.BookModuleRepository,
 	bookItemRepo repositories.BookItemRepository,
 	itemRepo *repositories.ItemRepository,
+	userRepo repositories.UserRepository,
 ) BookService {
 	return &bookService{
 		bookRepo:       bookRepo,
 		bookModuleRepo: bookModuleRepo,
 		bookItemRepo:   bookItemRepo,
 		itemRepo:       itemRepo,
+		userRepo:       userRepo,
 	}
 }
 
@@ -117,10 +206,28 @@ func (s *bookService) GetPublishedBooks() ([]entities.Book, error) {
 	return s.bookRepo.FindPublished()
 }
 
-func (s *bookService) GetBookDetail(bookID string, userID *uuid.UUID) (*entities.Book, error) {
+func (s *bookService) GetPublishedBookDetail(bookID string) (*entities.Book, error) {
 	book, err := s.bookRepo.FindByIDWithRelations(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
+	}
+
+	if book.Status != entities.BookStatusPublished {
+		return nil, errors.New("book is not published")
+	}
+
+	return book, nil
+}
+
+func (s *bookService) GetBookDetail(bookID string, userID *uuid.UUID, role string) (*entities.Book, error) {
+	book, err := s.bookRepo.FindByIDWithRelations(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	// Admin can view any book regardless of status
+	if role == "admin" {
+		return book, nil
 	}
 
 	// If not published, only owner can view
@@ -133,13 +240,127 @@ func (s *bookService) GetBookDetail(bookID string, userID *uuid.UUID) (*entities
 	return book, nil
 }
 
-func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeResponse, error) {
+// GetBookDetailWithStability returns book detail with stability information for each item
+func (s *bookService) GetBookDetailWithStability(bookID string, userID *uuid.UUID, role string) (*BookDetailWithStability, error) {
+	book, err := s.bookRepo.FindByIDWithRelations(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	// Admin can view any book regardless of status
+	if role != "admin" {
+		// If not published, only owner can view
+		if book.Status != entities.BookStatusPublished {
+			if userID == nil || book.OwnerID != *userID {
+				return nil, errors.New("you don't have access to this book")
+			}
+		}
+	}
+
+	// Load all modules and items for this book (same as GetBookTree)
+	modules, err := s.bookModuleRepo.FindByBookID(bookID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.bookItemRepo.FindByBookID(bookID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build content_ref map to fetch Item entities for stability calculation
+	contentRefs := make([]string, 0, len(items))
+	for _, it := range items {
+		contentRefs = append(contentRefs, "book:"+bookID+":item:"+it.ID.String())
+	}
+
+	// Fetch Item entities for stability calculation (if user is logged in)
+	itemByContentRef := make(map[string]*entities.Item)
+	if userID != nil {
+		for _, ref := range contentRefs {
+			existingItems, err := s.itemRepo.FindByOwnerAndContentRef(*userID, ref)
+			if err == nil && len(existingItems) > 0 {
+				itemByContentRef[ref] = &existingItems[0]
+			}
+		}
+	}
+
+	// Build module map and children links (same as GetBookTree)
+	modMap := make(map[string]*entities.BookModule)
+	childrenByParent := make(map[string][]string)
+	for i := range modules {
+		m := &modules[i]
+		id := m.ID.String()
+		modMap[id] = m
+		parentKey := ""
+		if m.ParentID != nil {
+			parentKey = m.ParentID.String()
+		}
+		childrenByParent[parentKey] = append(childrenByParent[parentKey], id)
+	}
+
+	// Group items by module_id (nil goes to book-level)
+	bookItems := make([]BookItemWithStability, 0)
+	itemsByModule := make(map[string][]BookItemWithStability)
+	for _, it := range items {
+		contentRef := "book:" + bookID + ":item:" + it.ID.String()
+		stability := calculateStability(itemByContentRef[contentRef])
+		itemWithStability := BookItemWithStability{
+			BookItem:  it,
+			Stability: stability,
+		}
+		if it.ModuleID == nil {
+			bookItems = append(bookItems, itemWithStability)
+			continue
+		}
+		key := it.ModuleID.String()
+		itemsByModule[key] = append(itemsByModule[key], itemWithStability)
+	}
+
+	// Recursive function to build modules with children
+	var buildModules func(parentID string) []ModuleWithStability
+	buildModules = func(parentID string) []ModuleWithStability {
+		childIDs := childrenByParent[parentID]
+		nodes := make([]ModuleWithStability, 0, len(childIDs))
+		for _, cid := range childIDs {
+			m := modMap[cid]
+			node := ModuleWithStability{
+				BookModule: *m,
+				Items:      itemsByModule[cid],
+				Children:   buildModules(cid),
+			}
+			nodes = append(nodes, node)
+		}
+		return nodes
+	}
+
+	return &BookDetailWithStability{
+		Book:    *book,
+		Items:   bookItems,
+		Modules: buildModules(""),
+	}, nil
+}
+
+func (s *bookService) GetBookDetailForAdmin(bookID string) (*entities.Book, error) {
+	book, err := s.bookRepo.FindByIDWithRelations(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	// Admin can view any book regardless of status
+	return book, nil
+}
+
+func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID, role string) (*BookTreeResponse, error) {
 	// Access control like GetBookDetail
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
 	}
-	if book.Status != entities.BookStatusPublished {
+
+	// Admin can view any book regardless of status
+	if role == "admin" {
+		// Continue to load data
+	} else if book.Status != entities.BookStatusPublished {
 		if userID == nil || book.OwnerID != *userID {
 			return nil, errors.New("you don't have access to this book")
 		}
@@ -155,16 +376,41 @@ func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeRe
 		return nil, err
 	}
 
-	// Group items by module_id (nil goes to book-level)
-	bookItems := make([]entities.BookItem, 0)
-	itemsByModule := make(map[string][]entities.BookItem)
+	// Build content_ref map to fetch Item entities for stability calculation
+	contentRefs := make([]string, 0, len(items))
 	for _, it := range items {
+		contentRefs = append(contentRefs, "book:"+bookID+":item:"+it.ID.String())
+	}
+
+	// Fetch Item entities for stability calculation (if user is logged in)
+	itemByContentRef := make(map[string]*entities.Item)
+	if userID != nil {
+		for _, ref := range contentRefs {
+			existingItems, err := s.itemRepo.FindByOwnerAndContentRef(*userID, ref)
+			if err == nil && len(existingItems) > 0 {
+				itemByContentRef[ref] = &existingItems[0]
+			}
+		}
+	}
+
+	// Group items by module_id (nil goes to book-level) and calculate stability
+	bookItems := make([]BookItemWithStability, 0)
+	itemsByModule := make(map[string][]BookItemWithStability)
+	for _, it := range items {
+		contentRef := "book:" + bookID + ":item:" + it.ID.String()
+		stability := calculateStability(itemByContentRef[contentRef])
+
+		itemWithStability := BookItemWithStability{
+			BookItem:  it,
+			Stability: stability,
+		}
+
 		if it.ModuleID == nil {
-			bookItems = append(bookItems, it)
+			bookItems = append(bookItems, itemWithStability)
 			continue
 		}
 		key := it.ModuleID.String()
-		itemsByModule[key] = append(itemsByModule[key], it)
+		itemsByModule[key] = append(itemsByModule[key], itemWithStability)
 	}
 
 	// Build module map and children links
@@ -185,13 +431,13 @@ func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeRe
 		childrenByParent[parentKey] = append(childrenByParent[parentKey], id)
 	}
 
-	var build func(parentID string) []ModuleNode
-	build = func(parentID string) []ModuleNode {
+	var build func(parentID string) []ModuleNodeWithItems
+	build = func(parentID string) []ModuleNodeWithItems {
 		childIDs := childrenByParent[parentID]
-		nodes := make([]ModuleNode, 0, len(childIDs))
+		nodes := make([]ModuleNodeWithItems, 0, len(childIDs))
 		for _, cid := range childIDs {
 			m := modMap[cid]
-			node := ModuleNode{
+			node := ModuleNodeWithItems{
 				ID:          m.ID.String(),
 				Title:       m.Title,
 				Description: m.Description,
@@ -212,6 +458,187 @@ func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID) (*BookTreeRe
 		Modules: build(""),
 	}
 	return tree, nil
+}
+
+func (s *bookService) AddPublishedBookToMyBook(userID uuid.UUID, bookID string) (*AddPublishedBookToMyBookResult, error) {
+	book, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	if book.Status != entities.BookStatusPublished {
+		return nil, errors.New("book is not published")
+	}
+
+	bookItems, err := s.bookItemRepo.FindByBookID(bookID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &AddPublishedBookToMyBookResult{
+		BookID:           bookID,
+		AddedCount:       0,
+		SkippedCount:     0,
+		AddedContentRefs: nil,
+	}
+
+	// Create Item rows (source_type=book) for each BookItem in the published book.
+	// We prevent duplicates by checking `content_ref` for the user.
+	for _, bi := range bookItems {
+		contentRef := "book:" + bookID + ":item:" + bi.ID.String()
+
+		existingItems, err := s.itemRepo.FindByOwnerAndContentRef(userID, contentRef)
+		if err != nil {
+			return nil, err
+		}
+		if len(existingItems) > 0 {
+			result.SkippedCount++
+			continue
+		}
+
+		item := &entities.Item{
+			OwnerID:                userID,
+			SourceType:             "book",
+			ContentRef:             contentRef,
+			Status:                 entities.ItemStatusMenghafal,
+			EstimatedReviewSeconds: bi.EstimatedReviewSeconds,
+		}
+
+		if err := s.itemRepo.Create(item); err != nil {
+			return nil, err
+		}
+
+		result.AddedCount++
+		// optional: return refs for UI debugging
+		if result.AddedContentRefs == nil {
+			result.AddedContentRefs = make([]string, 0, len(bookItems))
+		}
+		result.AddedContentRefs = append(result.AddedContentRefs, contentRef)
+	}
+
+	return result, nil
+}
+
+func (s *bookService) CopyPublishedBookToDraft(
+	userID uuid.UUID,
+	publishedBookID string,
+	title, description, coverImage string,
+) (*entities.Book, error) {
+	srcBook, err := s.bookRepo.FindByIDWithRelations(publishedBookID)
+	if err != nil {
+		return nil, errors.New("book not found")
+	}
+
+	if srcBook.Status != entities.BookStatusPublished {
+		return nil, errors.New("book is not published")
+	}
+
+	// Allow optional overrides; empty means "use source book value".
+	finalTitle := srcBook.Title
+	if title != "" {
+		finalTitle = title
+	}
+	finalDesc := srcBook.Description
+	if description != "" || srcBook.Description == "" {
+		// If both are empty, it doesn't matter; but if src description isn't empty,
+		// an empty override keeps using source to avoid accidental wipe.
+		if description != "" {
+			finalDesc = description
+		}
+	}
+	finalCover := srcBook.CoverImage
+	if coverImage != "" {
+		finalCover = coverImage
+	}
+
+	draft := &entities.Book{
+		OwnerID:     userID,
+		Title:       finalTitle,
+		Description: finalDesc,
+		CoverImage:  finalCover,
+		Status:      entities.BookStatusDraft,
+		PublishedAt: nil,
+	}
+	if err := s.bookRepo.Create(draft); err != nil {
+		return nil, err
+	}
+
+	// 1) Copy modules first (without parent pointers), so we can map IDs.
+	newModulesByOldID := make(map[uuid.UUID]*entities.BookModule)
+	for _, m := range srcBook.Modules {
+		newMod := &entities.BookModule{
+			BookID:      draft.ID,
+			ParentID:    nil, // fix in second pass
+			Title:       m.Title,
+			Description: m.Description,
+			Order:       m.Order,
+		}
+		if err := s.bookModuleRepo.Create(newMod); err != nil {
+			return nil, err
+		}
+		newModulesByOldID[m.ID] = newMod
+	}
+
+	// 2) Restore nesting (parent-child) using the ID map.
+	for _, m := range srcBook.Modules {
+		if m.ParentID == nil {
+			continue
+		}
+		newMod := newModulesByOldID[m.ID]
+		if newMod == nil {
+			return nil, errors.New("failed to copy module mapping")
+		}
+		parentNew := newModulesByOldID[*m.ParentID]
+		if parentNew == nil {
+			return nil, errors.New("failed to copy parent module mapping")
+		}
+		pid := parentNew.ID
+		newMod.ParentID = &pid
+		if err := s.bookModuleRepo.Update(newMod); err != nil {
+			return nil, err
+		}
+	}
+
+	// 3) Copy book-level items (module_id IS NULL)
+	for _, it := range srcBook.Items {
+		newItem := &entities.BookItem{
+			BookID:                 draft.ID,
+			ModuleID:               nil,
+			Title:                  it.Title,
+			Content:                it.Content,
+			Answer:                 it.Answer,
+			Order:                  it.Order,
+			EstimatedReviewSeconds: it.EstimatedReviewSeconds,
+		}
+		if err := s.bookItemRepo.Create(newItem); err != nil {
+			return nil, err
+		}
+	}
+
+	// 4) Copy module items
+	for _, m := range srcBook.Modules {
+		newMod := newModulesByOldID[m.ID]
+		if newMod == nil {
+			return nil, errors.New("failed to copy module")
+		}
+		for _, it := range m.Items {
+			modID := newMod.ID
+			newItem := &entities.BookItem{
+				BookID:                 draft.ID,
+				ModuleID:               &modID,
+				Title:                  it.Title,
+				Content:                it.Content,
+				Answer:                 it.Answer,
+				Order:                  it.Order,
+				EstimatedReviewSeconds: it.EstimatedReviewSeconds,
+			}
+			if err := s.bookItemRepo.Create(newItem); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return draft, nil
 }
 
 func (s *bookService) UpdateBook(bookID string, ownerID uuid.UUID, title, description, coverImage string) (*entities.Book, error) {
@@ -317,6 +744,28 @@ func (s *bookService) RejectBook(bookID string) error {
 	}
 
 	return s.bookRepo.UpdateStatus(bookID, entities.BookStatusRejected)
+}
+
+// DeletePublishedBook deletes a published book (Admin only)
+func (s *bookService) DeletePublishedBook(bookID string) error {
+	book, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return errors.New("book not found")
+	}
+
+	if book.Status != entities.BookStatusPublished {
+		return errors.New("book is not published")
+	}
+
+	// Delete all related items and modules
+	if err := s.bookItemRepo.DeleteByBookID(bookID); err != nil {
+		return err
+	}
+	if err := s.bookModuleRepo.DeleteByBookID(bookID); err != nil {
+		return err
+	}
+
+	return s.bookRepo.Delete(bookID)
 }
 
 // ==================== MODULE CRUD ====================
@@ -433,8 +882,9 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		return nil, errors.New("cannot add item to published book")
 	}
 
-	if title == "" {
-		return nil, errors.New("item title is required")
+	// Title is optional, but content or answer must be provided
+	if content == "" && answer == "" {
+		return nil, errors.New("either content or answer must be provided")
 	}
 
 	// Validate module belongs to book if provided
@@ -545,6 +995,8 @@ func (s *bookService) DeleteItem(itemID string, ownerID uuid.UUID) error {
 
 // ==================== MEMORIZATION ====================
 
+// StartItemMemorization starts memorizing a book item
+// If item already exists, returns the existing item instead of error
 func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID string) (*StartMemorizationResult, error) {
 	// 1. Get book and validate access
 	book, err := s.bookRepo.FindByID(bookID)
@@ -567,19 +1019,45 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 		return nil, errors.New("book item does not belong to this book")
 	}
 
-	// 3. Check if user already started this item (prevent duplicates)
+	// 3. Check if user already has this item
 	contentRef := "book:" + bookID + ":item:" + bookItemID
 	existingItems, err := s.itemRepo.FindByOwnerAndContentRef(userID, contentRef)
 	if err == nil && len(existingItems) > 0 {
-		return nil, errors.New("you have already started memorizing this item")
+		existingItem := &existingItems[0]
+		
+		// If item exists but status is 'menghafal', update to 'start'
+		// This handles items created from AddPublishedBookToMyBook
+		if existingItem.Status == entities.ItemStatusMenghafal {
+			existingItem.Status = entities.ItemStatusStart
+			if err := s.itemRepo.Update(existingItem); err != nil {
+				return nil, err
+			}
+			return &StartMemorizationResult{
+				ItemID:     existingItem.ID,
+				BookItemID: bookItem.ID,
+				BookTitle:  book.Title,
+				ItemTitle:  bookItem.Title,
+				Status:     entities.ItemStatusStart,
+			}, nil
+		}
+		
+		// Item already exists with other status, return as-is
+		return &StartMemorizationResult{
+			ItemID:     existingItem.ID,
+			BookItemID: bookItem.ID,
+			BookTitle:  book.Title,
+			ItemTitle:  bookItem.Title,
+			Status:     existingItem.Status,
+		}, nil
 	}
 
-	// 4. Create new Item with status menghafal
+	// 4. Create new Item with status "start" for book items
+	// Book items flow: START → FSRS_ACTIVE → GRADUATE
 	item := &entities.Item{
 		OwnerID:    userID,
 		SourceType: "book", // book items use "book" as source type
 		ContentRef: contentRef,
-		Status:     entities.ItemStatusMenghafal,
+		Status:     entities.ItemStatusStart, // Start phase for book items
 	}
 	// copy estimation from book item into Item for daily usage
 	item.EstimatedReviewSeconds = bookItem.EstimatedReviewSeconds
@@ -595,4 +1073,93 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 		ItemTitle:  bookItem.Title,
 		Status:     item.Status,
 	}, nil
+}
+
+// ==================== MY BOOK COLLECTION ====================
+
+func (s *bookService) GetMyBookCollection(userID uuid.UUID) ([]BookCollectionItem, error) {
+	// Fetch all book items (source_type = "book")
+	items, err := s.itemRepo.FindByOwnerAndSourceType(userID, "book")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(items) == 0 {
+		return []BookCollectionItem{}, nil
+	}
+
+	// Extract unique book IDs and track earliest added_at per book
+	bookIDMap := make(map[string]*BookCollectionItem)
+	bookOrder := make([]string, 0)
+
+	for _, item := range items {
+		// Parse content_ref: "book:BOOK_ID:item:BOOK_ITEM_ID"
+		parts := strings.Split(item.ContentRef, ":")
+		if len(parts) != 4 || parts[0] != "book" || parts[2] != "item" {
+			continue
+		}
+		bookID := parts[1]
+
+		if _, exists := bookIDMap[bookID]; !exists {
+			// Fetch book details
+			book, err := s.bookRepo.FindByID(bookID)
+			if err != nil {
+				continue // Skip if book not found
+			}
+
+			// Fetch owner name
+			ownerName := ""
+			owner, err := s.userRepo.FindByID(book.OwnerID.String())
+			if err == nil && owner != nil {
+				ownerName = owner.FullName
+			}
+
+			bookIDMap[bookID] = &BookCollectionItem{
+				BookID:      bookID,
+				Title:       book.Title,
+				Description: book.Description,
+				CoverImage:  book.CoverImage,
+				OwnerName:   ownerName,
+				ItemCount:   0,
+				AddedAt:     item.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
+			bookOrder = append(bookOrder, bookID)
+		}
+
+		bookIDMap[bookID].ItemCount++
+	}
+
+	// Build result in order
+	result := make([]BookCollectionItem, 0, len(bookOrder))
+	for _, bookID := range bookOrder {
+		result = append(result, *bookIDMap[bookID])
+	}
+
+	return result, nil
+}
+
+func (s *bookService) RemoveFromMyBookCollection(userID uuid.UUID, bookID string) error {
+	// Verify book exists
+	_, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return errors.New("book not found")
+	}
+
+	// Delete all items with content_ref starting with "book:BOOK_ID:"
+	// We need to fetch items first to delete them
+	items, err := s.itemRepo.FindByOwnerAndSourceType(userID, "book")
+	if err != nil {
+		return err
+	}
+
+	prefix := "book:" + bookID + ":item:"
+	for _, item := range items {
+		if strings.HasPrefix(item.ContentRef, prefix) {
+			if err := s.itemRepo.DeleteByID(item.ID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

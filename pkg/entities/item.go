@@ -12,6 +12,7 @@ import (
 // Item status constants
 const (
 	ItemStatusMenghafal       = "menghafal"
+	ItemStatusStart           = "start"           // Initial phase for book items
 	ItemStatusInterval        = "interval"
 	ItemStatusFSRSActive      = "fsrs_active"
 	ItemStatusPendingGraduate = "pending_graduate"

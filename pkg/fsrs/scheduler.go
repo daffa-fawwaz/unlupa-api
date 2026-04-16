@@ -6,7 +6,7 @@ import (
 )
 
 const DefaultRetention = 0.9
-const goodGainDamping = 0.6 // reduce stability jump for rating=Good (3)
+const goodGainDamping = 0.8 // reduce stability jump for rating=Good (3)
 
 type ReviewResult struct {
 	NewState CardState

@@ -122,7 +122,7 @@ func main() {
 	// ================= BOOK =================
 	bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
 	bookItemRepo := repositories.NewBookItemRepository(config.DB)
-	bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo)
+	bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo, userRepo)
 	bookHandler := handlers.NewBookHandler(bookSvc, appCache)
 
 	// ================= ITEM STATUS =================

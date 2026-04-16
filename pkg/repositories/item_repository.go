@@ -61,11 +61,38 @@ func (r *ItemRepository) FindIntervalReviewDue(ownerID uuid.UUID, now time.Time)
 }
 
 // FindFSRSDueItems finds items with status=fsrs_active and next_review_at <= now
+// Also includes book items with status=start (for first review)
 func (r *ItemRepository) FindFSRSDueItems(ownerID uuid.UUID, now time.Time) ([]entities.Item, error) {
 	var items []entities.Item
+	
+	// Get FSRS active items that are due (next_review_at <= now)
+	// Normalize now to end of day (23:59:59) to include all items due today
+	endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
+	
 	err := r.db.
-		Where("owner_id = ? AND status = ? AND next_review_at <= ?", ownerID, entities.ItemStatusFSRSActive, now).
+		Where("owner_id = ? AND status = ? AND next_review_at <= ?", 
+			ownerID, entities.ItemStatusFSRSActive, endOfDay).
 		Find(&items).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// Also get book items with status=start (they're always due for first review)
+	// These items don't have next_review_at set yet, or next_review_at is in the past
+	var startItems []entities.Item
+	err = r.db.
+		Where("owner_id = ? AND source_type = 'book' AND status = ?", 
+			ownerID, entities.ItemStatusStart).
+		Find(&startItems).Error
+	if err == nil {
+		for _, item := range startItems {
+			// Only include if next_review_at is NULL or in the past
+			if item.NextReviewAt == nil || item.NextReviewAt.Before(endOfDay) {
+				items = append(items, item)
+			}
+		}
+	}
+	
 	return items, err
 }
 
