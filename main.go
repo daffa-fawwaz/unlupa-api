@@ -57,6 +57,9 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	// Serve uploaded files
+	app.Static("/uploads", "./uploads")
+
 	// Swagger route
 	app.Get("/swagger/*", fiberSwagger.WrapHandler)
 
