@@ -12,6 +12,33 @@ import (
 	"github.com/google/uuid"
 )
 
+// UploadCoverImage godoc
+// @Summary Upload book cover image
+// @Description Upload a cover image (jpg/jpeg/png). Auto-resized if > 3MB. Returns the file path to use as cover_image.
+// @Tags Book
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param cover formData file true "Cover image file (jpg, jpeg, png)"
+// @Success 200 {object} utils.SuccessResponse{data=map[string]string}
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /books/upload-cover [post]
+func (h *BookHandler) UploadCoverImage(c *fiber.Ctx) error {
+	file, err := c.FormFile("cover")
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "cover file is required", "BAD_REQUEST", nil)
+	}
+
+	filePath, err := utils.SaveCoverImage(file)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPLOAD_FAILED", nil)
+	}
+
+	return utils.Success(c, fiber.StatusOK, "cover image uploaded successfully", fiber.Map{
+		"cover_image": filePath,
+	}, nil)
+}
+
 type BookHandler struct {
 	bookSvc services.BookService
 	cache   *cache.Cache
@@ -784,17 +811,19 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 	itemID := c.Params("id")
 
 	var req struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		Answer  string `json:"answer"`
-		Order   int    `json:"order"`
+		Title         string `json:"title"`
+		Content       string `json:"content"`
+		Answer        string `json:"answer"`
+		Order         int    `json:"order"`
+		EstimateValue int    `json:"estimate_value"`
+		EstimateUnit  string `json:"estimate_unit"` // "seconds" | "minutes"
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	item, err := h.bookSvc.UpdateItem(itemID, userID, req.Title, req.Content, req.Answer, req.Order)
+	item, err := h.bookSvc.UpdateItem(itemID, userID, req.Title, req.Content, req.Answer, req.Order, req.EstimateValue, req.EstimateUnit)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_ITEM_FAILED", nil)
 	}

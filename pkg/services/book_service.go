@@ -47,7 +47,7 @@ type BookService interface {
 
 	// Item CRUD
 	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error)
-	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error)
+	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
 
 	// Memorization
@@ -1094,7 +1094,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 	return item, nil
 }
 
-func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int) (*entities.BookItem, error) {
+func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error) {
 	item, err := s.bookItemRepo.FindByID(itemID)
 	if err != nil {
 		return nil, errors.New("item not found")
@@ -1124,6 +1124,14 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 	}
 	if order > 0 {
 		item.Order = order
+	}
+	if estimateVal > 0 {
+		switch strings.ToLower(estimateUnit) {
+		case "minutes":
+			item.EstimatedReviewSeconds = estimateVal * 60
+		default: // "seconds" or anything else
+			item.EstimatedReviewSeconds = estimateVal
+		}
 	}
 	item.UpdatedAt = time.Now().In(config.AppLocation)
 

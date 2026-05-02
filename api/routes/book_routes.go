@@ -16,6 +16,9 @@ func RegisterBookRoutes(
 		middlewares.JWTAuth(),
 	)
 
+	// Upload cover image
+	books.Post("/upload-cover", bookHandler.UploadCoverImage)
+
 	// Book CRUD - specific paths first
 	books.Post("/", bookHandler.CreateBook)
 	books.Get("/", bookHandler.GetMyBooks)
