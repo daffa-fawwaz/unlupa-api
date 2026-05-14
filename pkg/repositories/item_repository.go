@@ -158,6 +158,16 @@ func (r *ItemRepository) FindByOwnerAndSourceType(ownerID uuid.UUID, sourceType 
 	return items, err
 }
 
+// CountDistinctOwnersByBookID counts how many unique users have added items from a specific book
+func (r *ItemRepository) CountDistinctOwnersByBookID(bookID string) (int64, error) {
+	var count int64
+	err := r.db.Model(&entities.Item{}).
+		Where("source_type = 'book' AND content_ref LIKE ?", "book:"+bookID+":%").
+		Distinct("owner_id").
+		Count(&count).Error
+	return count, err
+}
+
 // FindEligibleForGraduationByStability finds fsrs_active Quran items with stability >= threshold
 func (r *ItemRepository) FindEligibleForGraduationByStability(ownerID uuid.UUID, stabilityThreshold float64) ([]entities.Item, error) {
 	var items []entities.Item

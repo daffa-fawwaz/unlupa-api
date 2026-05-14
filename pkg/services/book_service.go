@@ -17,7 +17,7 @@ type BookService interface {
 	// Book CRUD
 	CreateBook(ownerID uuid.UUID, title, description, coverImage string) (*entities.Book, error)
 	GetMyBooks(ownerID uuid.UUID) ([]entities.Book, error)
-	GetPublishedBooks() ([]entities.Book, error)
+	GetPublishedBooks() ([]PublishedBookWithStats, error)
 	GetPublishedBookDetail(bookID string) (*entities.Book, error)
 	GetBookDetail(bookID string, userID *uuid.UUID, role string) (*entities.Book, error)
 	GetBookDetailWithStability(bookID string, userID *uuid.UUID, role string) (*BookDetailWithStability, error)
@@ -27,7 +27,7 @@ type BookService interface {
 	DeleteBook(bookID string, ownerID uuid.UUID) error
 
 	// Publish workflow
-	RequestPublish(bookID string, ownerID uuid.UUID) error
+	RequestPublish(bookID string, ownerID uuid.UUID, isEditable bool) error
 	GetPendingBooks() ([]entities.Book, error)
 	ApproveBook(bookID string) error
 	RejectBook(bookID string) error
@@ -160,6 +160,12 @@ type BookCollectionItem struct {
 	AddedAt       string    `json:"added_at"`
 }
 
+// PublishedBookWithStats wraps a Book with additional stats for the published listing
+type PublishedBookWithStats struct {
+	entities.Book
+	TotalAdded int64 `json:"total_added"`
+}
+
 type bookService struct {
 	bookRepo               repositories.BookRepository
 	bookModuleRepo         repositories.BookModuleRepository
@@ -213,8 +219,21 @@ func (s *bookService) GetMyBooks(ownerID uuid.UUID) ([]entities.Book, error) {
 	return s.bookRepo.FindByOwner(ownerID.String())
 }
 
-func (s *bookService) GetPublishedBooks() ([]entities.Book, error) {
-	return s.bookRepo.FindPublished()
+func (s *bookService) GetPublishedBooks() ([]PublishedBookWithStats, error) {
+	books, err := s.bookRepo.FindPublished()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]PublishedBookWithStats, 0, len(books))
+	for _, book := range books {
+		count, _ := s.itemRepo.CountDistinctOwnersByBookID(book.ID.String())
+		result = append(result, PublishedBookWithStats{
+			Book:       book,
+			TotalAdded: count,
+		})
+	}
+	return result, nil
 }
 
 func (s *bookService) GetPublishedBookDetail(bookID string) (*entities.Book, error) {
@@ -567,6 +586,7 @@ func (s *bookService) CopyPublishedBookToDraft(
 		Title:       finalTitle,
 		Description: finalDesc,
 		CoverImage:  finalCover,
+		IsEditable:  srcBook.IsEditable, // inherit editable flag from source book
 		Status:      entities.BookStatusDraft,
 		PublishedAt: nil,
 	}
@@ -742,7 +762,7 @@ func (s *bookService) DeleteBook(bookID string, ownerID uuid.UUID) error {
 
 // ==================== PUBLISH WORKFLOW ====================
 
-func (s *bookService) RequestPublish(bookID string, ownerID uuid.UUID) error {
+func (s *bookService) RequestPublish(bookID string, ownerID uuid.UUID, isEditable bool) error {
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return errors.New("book not found")
@@ -754,6 +774,12 @@ func (s *bookService) RequestPublish(bookID string, ownerID uuid.UUID) error {
 
 	if book.Status != entities.BookStatusDraft && book.Status != entities.BookStatusRejected {
 		return errors.New("book must be in draft or rejected status to request publish")
+	}
+
+	// Save the editable flag before changing status
+	book.IsEditable = isEditable
+	if err := s.bookRepo.Update(book); err != nil {
+		return err
 	}
 
 	return s.bookRepo.UpdateStatus(bookID, entities.BookStatusPending)
@@ -933,6 +959,11 @@ func (s *bookService) AddModule(bookID string, ownerID uuid.UUID, title, descrip
 		return nil, errors.New("you don't have permission to add module to this book")
 	}
 
+	// Block edits if book is marked as non-editable (applies to draft copies from non-editable published books)
+	if !book.IsEditable {
+		return nil, errors.New("this book is not editable")
+	}
+
 	// Allow owner to add modules to published books
 	// (Changes are visible immediately, but owner should request update for metadata)
 	if title == "" {
@@ -973,6 +1004,10 @@ func (s *bookService) UpdateModule(moduleID string, ownerID uuid.UUID, title, de
 		return nil, errors.New("cannot update module in published book")
 	}
 
+	if !book.IsEditable {
+		return nil, errors.New("this book is not editable")
+	}
+
 	if title != "" {
 		module.Title = title
 	}
@@ -1009,6 +1044,10 @@ func (s *bookService) DeleteModule(moduleID string, ownerID uuid.UUID) error {
 		return errors.New("cannot delete module from published book")
 	}
 
+	if !book.IsEditable {
+		return errors.New("this book is not editable")
+	}
+
 	// Get all BookItems in this module to find their Item entities
 	bookItems, err := s.bookItemRepo.FindByModuleID(moduleID)
 	if err == nil && len(bookItems) > 0 {
@@ -1042,6 +1081,11 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 
 	if book.OwnerID != ownerID {
 		return nil, errors.New("you don't have permission to add item to this book")
+	}
+
+	// Block edits if book is marked as non-editable
+	if !book.IsEditable {
+		return nil, errors.New("this book is not editable")
 	}
 
 	// Allow owner to add items to published books
@@ -1113,6 +1157,10 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 		return nil, errors.New("cannot update item in published book")
 	}
 
+	if !book.IsEditable {
+		return nil, errors.New("this book is not editable")
+	}
+
 	if title != "" {
 		item.Title = title
 	}
@@ -1159,6 +1207,10 @@ func (s *bookService) DeleteItem(itemID string, ownerID uuid.UUID) error {
 
 	if book.Status == entities.BookStatusPublished {
 		return errors.New("cannot delete item from published book")
+	}
+
+	if !book.IsEditable {
+		return errors.New("this book is not editable")
 	}
 
 	// Delete Item entity if it exists (user already started memorizing this item)
