@@ -20,6 +20,7 @@ type DailyTaskResponse struct {
 	ItemID                 uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Source                 string    `json:"source" example:"quran"`
 	State                  string    `json:"state" example:"pending"`
+	Status                 string    `json:"status" example:"fsrs_active"`
 	TaskDate               string    `json:"task_date" example:"2026-02-06"` // YYYY-MM-DD
 	ContentRef             string    `json:"content_ref" example:"surah:78:1-5"`
 	JuzIndex               int       `json:"juz_index" example:"30"`
@@ -186,6 +187,7 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 
 	itemMap := make(map[uuid.UUID]string)
 	itemEstimateMap := make(map[uuid.UUID]int)
+	itemStatusMap := make(map[uuid.UUID]string)
 	bookIDs := make(map[string]struct{})
 	if len(itemIDs) > 0 {
 		items, err := h.itemRepo.FindByIDs(itemIDs)
@@ -193,6 +195,7 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			for _, item := range items {
 				itemMap[item.ID] = item.ContentRef
 				itemEstimateMap[item.ID] = item.EstimatedReviewSeconds
+				itemStatusMap[item.ID] = item.Status
 				// Collect book IDs from content_ref "book:{book_id}:item:{book_item_id}"
 				if len(item.ContentRef) > 5 && item.ContentRef[:5] == "book:" {
 					parts := make([]string, 0, 4)
@@ -262,6 +265,7 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			ItemID:                 t.ItemID,
 			Source:                 t.Source,
 			State:                  t.State,
+			Status:                 itemStatusMap[t.ItemID],
 			TaskDate:               t.TaskDate.Format("2006-01-02"),
 			ContentRef:             itemMap[t.ItemID],
 			JuzIndex:               juzMap[t.ItemID.String()],
