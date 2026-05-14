@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"hifzhun-api/pkg/cache"
-	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
 
@@ -115,7 +114,7 @@ func (h *BookHandler) GetMyBooks(c *fiber.Ctx) error {
 func (h *BookHandler) GetPublishedBooks(c *fiber.Ctx) error {
 	// Try cache first
 	cacheKey := "books:published"
-	var cached []entities.Book
+	var cached []services.PublishedBookWithStats
 	if h.cache.Get(c.Context(), cacheKey, &cached) {
 		return utils.Success(c, fiber.StatusOK, "published books fetched successfully", cached, nil)
 	}
@@ -245,12 +244,13 @@ func (h *BookHandler) DeleteBook(c *fiber.Ctx) error {
 
 // RequestPublish godoc
 // @Summary Request book publish
-// @Description Submit book for admin approval
+// @Description Submit book for admin approval. Set is_editable=true to allow users who import/copy this book to edit items and modules; false to make it read-only for them.
 // @Tags Book
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Book ID"
+// @Param request body RequestPublishRequest true "Request publish options"
 // @Success 200 {object} utils.SuccessResponse
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /books/{id}/request-publish [post]
@@ -258,7 +258,16 @@ func (h *BookHandler) RequestPublish(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	bookID := c.Params("id")
 
-	if err := h.bookSvc.RequestPublish(bookID, userID); err != nil {
+	var req struct {
+		IsEditable bool `json:"is_editable"`
+	}
+	// Default is_editable to true if body is empty or field not provided
+	req.IsEditable = true
+	if err := c.BodyParser(&req); err != nil {
+		// Body is optional; keep default
+	}
+
+	if err := h.bookSvc.RequestPublish(bookID, userID, req.IsEditable); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REQUEST_PUBLISH_FAILED", nil)
 	}
 
@@ -291,6 +300,8 @@ func (h *BookHandler) AddPublishedBookToMyBook(c *fiber.Ctx) error {
 	// Invalidate my-items cache so the newly added items show up.
 	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":book")
 	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":all")
+	// Invalidate published books cache so total_added count is refreshed.
+	h.cache.Delete(c.Context(), "books:published")
 
 	return utils.Success(c, fiber.StatusOK, "published book added to my book successfully", result, nil)
 }
@@ -854,6 +865,11 @@ func (h *BookHandler) DeleteItem(c *fiber.Ctx) error {
 }
 
 // ==================== REQUEST MODELS ====================
+
+// RequestPublishRequest represents request publish options
+type RequestPublishRequest struct {
+	IsEditable bool `json:"is_editable" example:"true"`
+}
 
 // CreateBookRequest represents create book request
 type CreateBookRequest struct {
