@@ -84,33 +84,34 @@ type ModuleWithStability struct {
 }
 
 // calculateStability calculates stability based on Item status and review dates
-// Returns "item belum masuk ujian" if status is start or no review data, otherwise calculates days until next review
+// calculateStability returns the interval in days between last_review_at and next_review_at.
+// Both dates are normalized to midnight so the result is always a whole number of days.
+// This value is fixed and only changes when next_review_at is updated after a review.
+// Returns "item belum masuk ujian" if item hasn't been reviewed yet.
 func calculateStability(item *entities.Item) string {
 	if item == nil {
 		return "item belum masuk ujian"
 	}
 
-	// If status is start, item hasn't entered FSRS phase yet
 	if item.Status == entities.ItemStatusStart {
 		return "item belum masuk ujian"
 	}
 
-	// For items in FSRS or other phases with NextReviewAt, calculate days until next review
 	if item.NextReviewAt != nil && item.LastReviewAt != nil {
-		now := time.Now().In(config.AppLocation)
-		// Calculate days from last review to next review (total interval)
-		totalInterval := item.NextReviewAt.Sub(*item.LastReviewAt).Hours() / 24
-		// Calculate days elapsed since last review
-		elapsed := now.Sub(*item.LastReviewAt).Hours() / 24
-		// Calculate remaining days until next review
-		remaining := totalInterval - elapsed
-		
-		if remaining < 0 {
-			remaining = 0
-		}
-		
-		// Return as string representation of integer days
-		return fmt.Sprintf("%.0f", remaining)
+		loc := item.NextReviewAt.Location()
+
+		// Normalize both to midnight so partial hours don't affect the day count
+		last := time.Date(
+			item.LastReviewAt.Year(), item.LastReviewAt.Month(), item.LastReviewAt.Day(),
+			0, 0, 0, 0, loc,
+		)
+		next := time.Date(
+			item.NextReviewAt.Year(), item.NextReviewAt.Month(), item.NextReviewAt.Day(),
+			0, 0, 0, 0, loc,
+		)
+
+		interval := next.Sub(last).Hours() / 24
+		return fmt.Sprintf("%.0f", interval)
 	}
 
 	return "item belum masuk ujian"
@@ -955,17 +956,18 @@ func (s *bookService) AddModule(bookID string, ownerID uuid.UUID, title, descrip
 		return nil, errors.New("book not found")
 	}
 
-	if book.OwnerID != ownerID {
-		return nil, errors.New("you don't have permission to add module to this book")
+	// For published books: allow anyone if is_editable=true, owner always can edit
+	// For non-published books: only owner can edit
+	if book.Status == entities.BookStatusPublished {
+		if !book.IsEditable && book.OwnerID != ownerID {
+			return nil, errors.New("this book is not editable")
+		}
+	} else {
+		if book.OwnerID != ownerID {
+			return nil, errors.New("you don't have permission to add module to this book")
+		}
 	}
 
-	// Block edits if book is marked as non-editable (applies to draft copies from non-editable published books)
-	if !book.IsEditable {
-		return nil, errors.New("this book is not editable")
-	}
-
-	// Allow owner to add modules to published books
-	// (Changes are visible immediately, but owner should request update for metadata)
 	if title == "" {
 		return nil, errors.New("module title is required")
 	}
@@ -996,16 +998,16 @@ func (s *bookService) UpdateModule(moduleID string, ownerID uuid.UUID, title, de
 		return nil, errors.New("book not found")
 	}
 
-	if book.OwnerID != ownerID {
-		return nil, errors.New("you don't have permission to update this module")
-	}
-
+	// Published books: allow anyone if is_editable=true, owner always can edit
+	// Non-published books: only owner can edit
 	if book.Status == entities.BookStatusPublished {
-		return nil, errors.New("cannot update module in published book")
-	}
-
-	if !book.IsEditable {
-		return nil, errors.New("this book is not editable")
+		if !book.IsEditable && book.OwnerID != ownerID {
+			return nil, errors.New("this book is not editable")
+		}
+	} else {
+		if book.OwnerID != ownerID {
+			return nil, errors.New("you don't have permission to update this module")
+		}
 	}
 
 	if title != "" {
@@ -1036,16 +1038,16 @@ func (s *bookService) DeleteModule(moduleID string, ownerID uuid.UUID) error {
 		return errors.New("book not found")
 	}
 
-	if book.OwnerID != ownerID {
-		return errors.New("you don't have permission to delete this module")
-	}
-
+	// Published books: allow anyone if is_editable=true, owner always can delete
+	// Non-published books: only owner can delete
 	if book.Status == entities.BookStatusPublished {
-		return errors.New("cannot delete module from published book")
-	}
-
-	if !book.IsEditable {
-		return errors.New("this book is not editable")
+		if !book.IsEditable && book.OwnerID != ownerID {
+			return errors.New("this book is not editable")
+		}
+	} else {
+		if book.OwnerID != ownerID {
+			return errors.New("you don't have permission to delete this module")
+		}
 	}
 
 	// Get all BookItems in this module to find their Item entities
@@ -1079,13 +1081,16 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		return nil, errors.New("book not found")
 	}
 
-	if book.OwnerID != ownerID {
-		return nil, errors.New("you don't have permission to add item to this book")
-	}
-
-	// Block edits if book is marked as non-editable
-	if !book.IsEditable {
-		return nil, errors.New("this book is not editable")
+	// Published books: allow anyone if is_editable=true, owner always can edit
+	// Non-published books: only owner can edit
+	if book.Status == entities.BookStatusPublished {
+		if !book.IsEditable && book.OwnerID != ownerID {
+			return nil, errors.New("this book is not editable")
+		}
+	} else {
+		if book.OwnerID != ownerID {
+			return nil, errors.New("you don't have permission to add item to this book")
+		}
 	}
 
 	// Allow owner to add items to published books
@@ -1149,16 +1154,16 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 		return nil, errors.New("book not found")
 	}
 
-	if book.OwnerID != ownerID {
-		return nil, errors.New("you don't have permission to update this item")
-	}
-
+	// Published books: allow anyone if is_editable=true, owner always can edit
+	// Non-published books: only owner can edit
 	if book.Status == entities.BookStatusPublished {
-		return nil, errors.New("cannot update item in published book")
-	}
-
-	if !book.IsEditable {
-		return nil, errors.New("this book is not editable")
+		if !book.IsEditable && book.OwnerID != ownerID {
+			return nil, errors.New("this book is not editable")
+		}
+	} else {
+		if book.OwnerID != ownerID {
+			return nil, errors.New("you don't have permission to update this item")
+		}
 	}
 
 	if title != "" {
@@ -1201,16 +1206,16 @@ func (s *bookService) DeleteItem(itemID string, ownerID uuid.UUID) error {
 		return errors.New("book not found")
 	}
 
-	if book.OwnerID != ownerID {
-		return errors.New("you don't have permission to delete this item")
-	}
-
+	// Published books: allow anyone if is_editable=true, owner always can delete
+	// Non-published books: only owner can delete
 	if book.Status == entities.BookStatusPublished {
-		return errors.New("cannot delete item from published book")
-	}
-
-	if !book.IsEditable {
-		return errors.New("this book is not editable")
+		if !book.IsEditable && book.OwnerID != ownerID {
+			return errors.New("this book is not editable")
+		}
+	} else {
+		if book.OwnerID != ownerID {
+			return errors.New("you don't have permission to delete this item")
+		}
 	}
 
 	// Delete Item entity if it exists (user already started memorizing this item)
