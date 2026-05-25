@@ -10,6 +10,13 @@ definitions:
         type: string
       id:
         type: string
+      is_editable:
+        description: |-
+          IsEditable controls whether users who import/copy this published book
+          can add, edit, or delete items and modules on their own copy.
+          true  = importers can freely edit their copy
+          false = importers cannot modify items/modules (read-only for them)
+        type: boolean
       items:
         items:
           $ref: '#/definitions/entities.BookItem'
@@ -32,6 +39,9 @@ definitions:
     type: object
   entities.BookItem:
     properties:
+      answer:
+        description: jawaban
+        type: string
       book_id:
         type: string
       content:
@@ -39,6 +49,9 @@ definitions:
         type: string
       created_at:
         type: string
+      estimated_review_seconds:
+        description: Estimasi waktu review (detik) opsional untuk item buku.
+        type: integer
       id:
         type: string
       module_id:
@@ -74,6 +87,41 @@ definitions:
       title:
         type: string
     type: object
+  entities.BookUpdateRequest:
+    properties:
+      approved_at:
+        type: string
+      approved_by:
+        type: string
+      book:
+        allOf:
+        - $ref: '#/definitions/entities.Book'
+        description: Relations
+      book_id:
+        type: string
+      cover_image:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      owner:
+        $ref: '#/definitions/entities.User'
+      owner_id:
+        type: string
+      reject_reason:
+        type: string
+      requested_at:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   entities.Class:
     properties:
       books:
@@ -81,6 +129,8 @@ definitions:
           $ref: '#/definitions/entities.ClassBook'
         type: array
       class_code:
+        type: string
+      cover_image:
         type: string
       created_at:
         type: string
@@ -99,6 +149,10 @@ definitions:
         type: array
       name:
         type: string
+      owner_name:
+        type: string
+      student_count:
+        type: integer
       type:
         description: quran | book
         type: string
@@ -147,13 +201,22 @@ definitions:
         type: string
       difficulty:
         type: number
+      estimatedReviewSeconds:
+        description: Estimated time per review (in seconds) for this item, optional
+        type: integer
+      fsrsstartAt:
+        description: 'FSRS start time: when item entered fsrs_active phase (day 1)'
+        type: string
       id:
         type: string
       intervalDays:
         description: Custom interval days (for interval phase)
         type: integer
       intervalEndAt:
-        description: Deadline for interval
+        description: 'Legacy: deadline for interval (kept for compatibility)'
+        type: string
+      intervalNextReviewAt:
+        description: Next recurring interval review date
         type: string
       intervalStartAt:
         description: When interval started
@@ -179,14 +242,24 @@ definitions:
     type: object
   entities.Juz:
     properties:
-      createdAt:
+      class_id:
+        type: string
+      created_at:
+        type: string
+      done_at:
         type: string
       id:
         type: string
       index:
         description: 1 - 30
         type: integer
-      userID:
+      is_active:
+        type: boolean
+      is_done:
+        type: boolean
+      updated_at:
+        type: string
+      user_id:
         type: string
     type: object
   entities.TeacherRequest:
@@ -234,18 +307,20 @@ definitions:
       updated_at:
         type: string
     type: object
-  fiber.Error:
-    properties:
-      code:
-        type: integer
-      message:
-        type: string
-    type: object
   handlers.AddBookItemRequest:
     properties:
+      answer:
+        example: Jawaban dari pertanyaan...
+        type: string
       content:
         example: Penjelasan hukum nun mati...
         type: string
+      estimate_unit:
+        example: minutes
+        type: string
+      estimate_value:
+        example: 2
+        type: integer
       order:
         example: 1
         type: integer
@@ -264,12 +339,21 @@ definitions:
     type: object
   handlers.AddModuleItemRequest:
     properties:
+      answer:
+        example: Jawaban...
+        type: string
       book_id:
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
       content:
         example: Konten item...
         type: string
+      estimate_unit:
+        example: seconds
+        type: string
+      estimate_value:
+        example: 90
+        type: integer
       order:
         example: 1
         type: integer
@@ -292,6 +376,18 @@ definitions:
         example: 'Bab 1: Pengenalan'
         type: string
     type: object
+  handlers.CopyPublishedBookToDraftRequest:
+    properties:
+      cover_image:
+        example: https://example.com/cover.jpg
+        type: string
+      description:
+        example: Panduan belajar tajwid (versi draft)
+        type: string
+      title:
+        example: Belajar Tajwid (Copy)
+        type: string
+    type: object
   handlers.CreateBookRequest:
     properties:
       cover_image:
@@ -306,6 +402,9 @@ definitions:
     type: object
   handlers.CreateClassRequest:
     properties:
+      cover_image:
+        example: https://example.com/class-cover.jpg
+        type: string
       description:
         example: Belajar tajwid dari dasar
         type: string
@@ -322,9 +421,17 @@ definitions:
   handlers.CreateHafalanRequest:
     properties:
       content_ref:
-        description: surah:78:1-5 | page:582
+        description: surah:78:1-5 | page:582 or page:585-589
         example: surah:78:1-5
         type: string
+      estimate_unit:
+        description: seconds | minutes
+        example: seconds
+        type: string
+      estimate_value:
+        description: nilai estimasi
+        example: 45
+        type: integer
       mode:
         description: surah | page
         example: surah
@@ -332,17 +439,29 @@ definitions:
     type: object
   handlers.DailyTaskResponse:
     properties:
-      card_id:
-        example: 550e8400-e29b-41d4-a716-446655440001
+      book_title:
+        example: Belajar Tajwid
         type: string
+      content_ref:
+        example: surah:78:1-5
+        type: string
+      estimated_review_seconds:
+        example: 120
+        type: integer
       item_id:
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
+      juz_index:
+        example: 30
+        type: integer
       source:
         example: quran
         type: string
       state:
         example: pending
+        type: string
+      status:
+        example: fsrs_active
         type: string
       task_date:
         description: YYYY-MM-DD
@@ -364,6 +483,53 @@ definitions:
         type: string
       reason:
         example: Student has mastered this item
+        type: string
+    type: object
+  handlers.IntervalStatsResponse:
+    properties:
+      average_rating:
+        type: number
+      item_id:
+        type: string
+      performance:
+        description: bad, good, perfect, no_reviews
+        type: string
+      total_reviews:
+        type: integer
+    type: object
+  handlers.ItemDetailResponse:
+    properties:
+      answer:
+        type: string
+      book_item_title:
+        type: string
+      book_title:
+        type: string
+      content_ref:
+        type: string
+      difficulty:
+        type: number
+      estimated_review_seconds:
+        type: integer
+      interval_days:
+        type: integer
+      interval_next_review_at:
+        type: string
+      item_id:
+        type: string
+      juz_index:
+        type: integer
+      next_review_at:
+        type: string
+      question:
+        type: string
+      review_count:
+        type: integer
+      source_type:
+        type: string
+      stability:
+        type: number
+      status:
         type: string
     type: object
   handlers.JoinClassRequest:
@@ -443,35 +609,57 @@ definitions:
         example: student
         type: string
     type: object
-  handlers.ReviewCardRequest:
-    description: Review card request with rating
+  handlers.RejectBookUpdateRequest:
+    properties:
+      reason:
+        example: Content needs revision
+        type: string
+    type: object
+  handlers.RequestBookUpdateRequest:
+    properties:
+      cover_image:
+        example: https://example.com/cover2.jpg
+        type: string
+      description:
+        example: Updated description
+        type: string
+      title:
+        example: Belajar Tajwid Lengkap v2
+        type: string
+    type: object
+  handlers.RequestPublishRequest:
+    properties:
+      is_editable:
+        example: true
+        type: boolean
+    type: object
+  handlers.ReviewIntervalRequest:
     properties:
       rating:
-        description: 1=Again, 2=Hard, 3=Good, 4=Easy
+        description: 1=bad, 2=good, 3=perfect
         example: 3
-        maximum: 4
+        maximum: 3
         minimum: 1
         type: integer
     type: object
-  handlers.ReviewCardResponse:
-    description: Response after reviewing a card
+  handlers.ReviewIntervalResponse:
     properties:
-      card_id:
-        example: 550e8400-e29b-41d4-a716-446655440000
+      content_ref:
         type: string
-      difficulty:
-        example: 3.2
-        type: number
-      last_review_at:
-        type: string
-      next_interval_days:
-        example: 7
+      interval_days:
         type: integer
-      next_review_at:
+      interval_next_review_at:
         type: string
-      stability:
-        example: 5.5
-        type: number
+      item_id:
+        type: string
+      rating:
+        type: integer
+      rating_label:
+        type: string
+      review_count:
+        type: integer
+      status:
+        type: string
     type: object
   handlers.ReviewItemRequest:
     properties:
@@ -484,6 +672,9 @@ definitions:
     type: object
   handlers.ReviewItemResponse:
     properties:
+      content_ref:
+        example: surah:78:1-5
+        type: string
       difficulty:
         example: 3.2
         type: number
@@ -493,6 +684,9 @@ definitions:
       item_id:
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
+      juz_index:
+        example: 30
+        type: integer
       next_interval_days:
         example: 7
         type: integer
@@ -522,6 +716,9 @@ definitions:
     type: object
   handlers.UpdateBookItemRequest:
     properties:
+      answer:
+        example: Updated answer...
+        type: string
       content:
         example: Updated content...
         type: string
@@ -556,6 +753,12 @@ definitions:
         example: Kelas Tajwid B
         type: string
     type: object
+  handlers.UpdateIntervalDaysRequest:
+    properties:
+      interval_days:
+        example: 7
+        type: integer
+    type: object
   handlers.UpdateModuleRequest:
     properties:
       description:
@@ -577,8 +780,104 @@ definitions:
       rejected:
         type: integer
     type: object
+  services.AddPublishedBookToMyBookResult:
+    properties:
+      added_content_refs:
+        items:
+          type: string
+        type: array
+      added_count:
+        type: integer
+      book_id:
+        type: string
+      skipped_count:
+        type: integer
+    type: object
+  services.BookCollectionItem:
+    properties:
+      added_at:
+        type: string
+      book_id:
+        type: string
+      cover_image:
+        type: string
+      description:
+        type: string
+      item_count:
+        type: integer
+      owner_name:
+        type: string
+      title:
+        type: string
+    type: object
+  services.BookDetailWithStability:
+    properties:
+      cover_image:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_editable:
+        description: |-
+          IsEditable controls whether users who import/copy this published book
+          can add, edit, or delete items and modules on their own copy.
+          true  = importers can freely edit their copy
+          false = importers cannot modify items/modules (read-only for them)
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/services.BookItemWithStability'
+        type: array
+      modules:
+        items:
+          $ref: '#/definitions/services.ModuleWithStability'
+        type: array
+      owner_id:
+        type: string
+      published_at:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  services.BookItemWithStability:
+    properties:
+      answer:
+        description: jawaban
+        type: string
+      book_id:
+        type: string
+      content:
+        description: materi konten
+        type: string
+      created_at:
+        type: string
+      estimated_review_seconds:
+        description: Estimasi waktu review (detik) opsional untuk item buku.
+        type: integer
+      id:
+        type: string
+      module_id:
+        description: null jika langsung di book
+        type: string
+      order:
+        type: integer
+      stability:
+        description: '"item belum masuk ujian" or days until next review'
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   services.ItemDetail:
-    description: Detail of a single hafalan item including its current phase/status
+    description: Detail of a single class-scoped item including its current phase/status
     properties:
       content_ref:
         description: Content reference (e.g., "surah:78:1-10" or "page:582")
@@ -630,6 +929,32 @@ definitions:
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
     type: object
+  services.ModuleWithStability:
+    properties:
+      book_id:
+        type: string
+      children:
+        items:
+          $ref: '#/definitions/services.ModuleWithStability'
+        type: array
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/services.BookItemWithStability'
+        type: array
+      order:
+        type: integer
+      parent_id:
+        description: untuk nested module (opsional)
+        type: string
+      title:
+        type: string
+    type: object
   services.PendingGraduation:
     description: Item pending teacher approval for graduation
     properties:
@@ -679,7 +1004,7 @@ definitions:
         type: string
     type: object
   services.StudentProgress:
-    description: Progress data for a student in a Quran-type class, showing hafalan
+    description: Progress data for a student in a class, showing class-scoped item
       statistics and item details
     properties:
       email:
@@ -698,6 +1023,10 @@ definitions:
       graduate:
         description: Number of items in 'graduate' status (mastered/completed memorization)
         example: 5
+        type: integer
+      inactive:
+        description: Number of book items in 'inactive' status
+        example: 1
         type: integer
       interval:
         description: Number of items in 'interval' status (waiting for interval period
@@ -722,6 +1051,10 @@ definitions:
         description: Overall progress percentage (graduate / total_items * 100)
         example: 16.67
         type: number
+      start:
+        description: Number of book items in 'start' status
+        example: 3
+        type: integer
       total_items:
         description: Total number of hafalan items the student has
         example: 30
@@ -797,6 +1130,168 @@ info:
   title: Hifzhun API
   version: "1.0"
 paths:
+  /admin/book-updates/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve a pending book update request
+      parameters:
+      - description: Update Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve book update (Admin)
+      tags:
+      - Book Admin
+  /admin/book-updates/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject a pending book update request
+      parameters:
+      - description: Update Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reject request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RejectBookUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject book update (Admin)
+      tags:
+      - Book Admin
+  /admin/book-updates/pending:
+    get:
+      consumes:
+      - application/json
+      description: Get all pending book update requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.BookUpdateRequest'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get pending book updates (Admin)
+      tags:
+      - Book Admin
+  /admin/books/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a published book and all its modules/items
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete published book (Admin)
+      tags:
+      - Book Admin
+    get:
+      consumes:
+      - application/json
+      description: Get any user's book detail with modules and items (Admin only)
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Book'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get book detail (Admin)
+      tags:
+      - Book Admin
   /admin/books/{id}/approve:
     post:
       consumes:
@@ -1342,7 +1837,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get book detail with modules and items
+      description: Get book detail with modules and items. Class-assigned books are
+        accessible to students who joined a class containing the book.
       parameters:
       - description: Book ID
         in: path
@@ -1359,7 +1855,7 @@ paths:
             - $ref: '#/definitions/utils.SuccessResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/entities.Book'
+                  $ref: '#/definitions/services.BookDetailWithStability'
               type: object
         "404":
           description: Not Found
@@ -1411,8 +1907,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: User starts memorizing a specific item from a book (published or
-        owned)
+      description: User starts memorizing a specific item from a book. For class-assigned
+        books, only students who joined a class containing the book can start its
+        items.
       parameters:
       - description: Book ID
         in: path
@@ -1449,13 +1946,21 @@ paths:
     post:
       consumes:
       - application/json
-      description: Submit book for admin approval
+      description: Submit book for admin approval. Set is_editable=true to allow users
+        who import/copy this book to edit items and modules; false to make it read-only
+        for them.
       parameters:
       - description: Book ID
         in: path
         name: id
         required: true
         type: string
+      - description: Request publish options
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RequestPublishRequest'
       produces:
       - application/json
       responses:
@@ -1470,6 +1975,106 @@ paths:
       security:
       - BearerAuth: []
       summary: Request book publish
+      tags:
+      - Book
+  /books/{id}/request-update:
+    post:
+      consumes:
+      - application/json
+      description: Request an update for a published book (requires admin approval)
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RequestBookUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.BookUpdateRequest'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request book update (Owner)
+      tags:
+      - Book
+  /books/{id}/tree:
+    get:
+      consumes:
+      - application/json
+      description: Get hierarchical modules (with items) for a book. Class-assigned
+        books are accessible to students who joined a class containing the book.
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get book module tree
+      tags:
+      - Book
+  /books/{id}/update-requests:
+    get:
+      consumes:
+      - application/json
+      description: Get all update requests for a book
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entities.BookUpdateRequest'
+                  type: array
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get book update requests
       tags:
       - Book
   /books/items/{id}:
@@ -1638,6 +2243,63 @@ paths:
       summary: Add item to module
       tags:
       - Book Item
+  /books/my-collection:
+    get:
+      consumes:
+      - application/json
+      description: Get all published books added to user's collection (read-only books
+        from other users)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/services.BookCollectionItem'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my book collection
+      tags:
+      - My Book Collection
+  /books/my-collection/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a book from user's collection (deletes all memorization
+        items from that book)
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove book from my collection
+      tags:
+      - My Book Collection
   /books/published:
     get:
       consumes:
@@ -1664,43 +2326,149 @@ paths:
       summary: Get published books
       tags:
       - Book
-  /cards/{id}/review:
-    post:
+  /books/published/{id}:
+    get:
       consumes:
       - application/json
-      description: Submit a review rating for a flashcard (FSRS algorithm)
+      description: Get book detail for a book that must be in published status
       parameters:
-      - description: Card ID
+      - description: Book ID
         in: path
         name: id
         required: true
         type: string
-      - description: Review rating (1=Again, 2=Hard, 3=Good, 4=Easy)
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.ReviewCardRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.ReviewCardResponse'
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Book'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get published book detail
+      tags:
+      - Book
+  /books/published/{id}/add-to-my-books:
+    post:
+      consumes:
+      - application/json
+      description: Create Item rows for each BookItem in the published book (preparing
+        user memorization items)
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.AddPublishedBookToMyBookResult'
+              type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/fiber.Error'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Review a card
+      summary: Add a published book into my book items
       tags:
-      - Card
+      - Book
+  /books/published/{id}/copy-to-draft:
+    post:
+      consumes:
+      - application/json
+      description: Copy published book structure (modules & items) into a new draft
+        owned by the user
+      parameters:
+      - description: Published Book ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Copy request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CopyPublishedBookToDraftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Book'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Copy published book to my draft
+      tags:
+      - Book
+  /books/upload-cover:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a cover image (jpg/jpeg/png). Auto-resized if > 3MB. Returns
+        the file path to use as cover_image.
+      parameters:
+      - description: Cover image file (jpg, jpeg, png)
+        in: formData
+        name: cover
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload book cover image
+      tags:
+      - Book
   /classes:
     get:
       consumes:
@@ -1876,7 +2644,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get all books in a book-type class
+      description: Get all books in a book-type class. Teacher and students who joined
+        the class can access this endpoint.
       parameters:
       - description: Class ID
         in: path
@@ -1987,7 +2756,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Teacher approves an item for graduation
+      description: Teacher approves an item for graduation. The item must belong to
+        a student in this Quran class and be created in a juz with this class_id.
       parameters:
       - description: Class ID
         in: path
@@ -2023,7 +2793,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Teacher rejects an item for graduation (returns to fsrs_active)
+      description: Teacher rejects an item for graduation (returns to fsrs_active).
+        The item must belong to this Quran class scope.
       parameters:
       - description: Class ID
         in: path
@@ -2059,7 +2830,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Teacher gets all items pending graduation approval in a class
+      description: Teacher gets all Quran items pending graduation approval in a class.
+        Only items created in juz with this class_id are returned.
       parameters:
       - description: Class ID
         in: path
@@ -2162,7 +2934,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get progress of all students in quran-type class
+      description: Get progress of all students for class-scoped items. Quran classes
+        use juz created with class_id; book classes use books assigned to the class.
       parameters:
       - description: Class ID
         in: path
@@ -2257,64 +3030,6 @@ paths:
       summary: Get joined classes
       tags:
       - Class
-  /daily-tasks/{card_id}/done:
-    post:
-      consumes:
-      - application/json
-      description: Mark a daily task as completed
-      parameters:
-      - description: Card ID
-        in: path
-        name: card_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/fiber.Error'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/fiber.Error'
-      security:
-      - BearerAuth: []
-      summary: Mark task as done
-      tags:
-      - Daily Task
-  /daily-tasks/{card_id}/skip:
-    post:
-      consumes:
-      - application/json
-      description: Mark a daily task as skipped
-      parameters:
-      - description: Card ID
-        in: path
-        name: card_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/fiber.Error'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/fiber.Error'
-      security:
-      - BearerAuth: []
-      summary: Mark task as skipped
-      tags:
-      - Daily Task
   /daily-tasks/generate:
     post:
       consumes:
@@ -2337,11 +3052,11 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Generate today's tasks
@@ -2364,11 +3079,11 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List today's tasks
@@ -2397,7 +3112,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Make graduation decision
@@ -2437,14 +3152,80 @@ paths:
       summary: Get items by status
       tags:
       - Item Status
+  /items/{item_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information for an item, with book/juz enrichment
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.ItemDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get item detail
+      tags:
+      - Item Status
+  /items/{item_id}/activate-fsrs:
+    post:
+      consumes:
+      - application/json
+      description: Move item from interval to fsrs_active phase (user decision). For
+        class book items, only students who joined a class containing the book can
+        activate FSRS.
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Item'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Activate item to FSRS phase
+      tags:
+      - Item Status
   /items/{item_id}/deactivate:
     post:
       consumes:
       - application/json
       description: Move book item from fsrs_active to inactive status. Only for non-quran
-        items.
+        items. Accepts item_id from items table or book_items table.
       parameters:
-      - description: Item ID
+      - description: Item ID (from items or book_items table)
         in: path
         name: item_id
         required: true
@@ -2470,14 +3251,86 @@ paths:
       summary: Deactivate a book item
       tags:
       - Item Status
+  /items/{item_id}/interval-days:
+    patch:
+      consumes:
+      - application/json
+      description: Change interval_days and set next interval review to now + interval_days
+        (00:00)
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      - description: New interval days
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIntervalDaysRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.Item'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update interval days for interval phase
+      tags:
+      - Item Status
+  /items/{item_id}/interval-stats:
+    get:
+      consumes:
+      - application/json
+      description: Get average rating and performance label for an item's interval
+        reviews
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.IntervalStatsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get interval review statistics
+      tags:
+      - Item Status
   /items/{item_id}/reactivate:
     post:
       consumes:
       - application/json
       description: Move book item from inactive back to fsrs_active status. Only for
-        non-quran items.
+        non-quran items. Accepts item_id from items table or book_items table.
       parameters:
-      - description: Item ID
+      - description: Item ID (from items or book_items table)
         in: path
         name: item_id
         required: true
@@ -2507,7 +3360,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Submit a review rating for a hafalan item
+      description: Submit a review rating for a hafalan item. Class book items can
+        only be reviewed by students who joined a class containing the book.
       parameters:
       - description: Item ID
         in: path
@@ -2541,11 +3395,50 @@ paths:
       summary: Review an item
       tags:
       - Item Review
+  /items/{item_id}/review-interval:
+    post:
+      consumes:
+      - application/json
+      description: Submit a review rating for an item during interval phase (1=bad,
+        2=good, 3=perfect)
+      parameters:
+      - description: Item ID
+        in: path
+        name: item_id
+        required: true
+        type: string
+      - description: Review rating (1=bad, 2=good, 3=perfect)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ReviewIntervalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.ReviewIntervalResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Review an item in interval phase
+      tags:
+      - Item Status
   /items/{item_id}/start-interval:
     post:
       consumes:
       - application/json
-      description: Move item from menghafal to interval phase
+      description: Move item from menghafal to interval phase with recurring review
       parameters:
       - description: Item ID
         in: path
@@ -2607,17 +3500,51 @@ paths:
       summary: Get items with deadline reached
       tags:
       - Item Status
+  /juz:
+    get:
+      description: Get all juz entries with counts per status. Send class_id to return
+        only juz created inside that Quran class.
+      parameters:
+      - description: Filter by class-scoped Quran juz
+        in: query
+        name: class_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my juz list with item status counts
+      tags:
+      - Juz
   /juz/{index}:
     post:
       consumes:
       - application/json
-      description: Create a new juz entry for Quran memorization
+      description: Create a new juz entry for Quran memorization. Send class_id to
+        create the juz inside a joined Quran class scope.
       parameters:
       - description: Juz index (1-30)
         in: path
         name: index
         required: true
         type: integer
+      - description: Class ID for class-scoped Quran juz
+        in: query
+        name: class_id
+        type: string
       produces:
       - application/json
       responses:
@@ -2637,6 +3564,122 @@ paths:
       security:
       - BearerAuth: []
       summary: Create juz for hafalan
+      tags:
+      - Juz
+  /juz/{index}/activate:
+    post:
+      description: Mengaktifkan juz tertentu agar masuk antrian review graduate
+      parameters:
+      - description: Juz index (1-30)
+        in: path
+        name: index
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Aktifkan juz
+      tags:
+      - Juz
+  /juz/{index}/deactivate:
+    post:
+      description: Menonaktifkan juz tertentu agar dilewati dalam antrian review graduate
+      parameters:
+      - description: Juz index (1-30)
+        in: path
+        name: index
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Nonaktifkan juz
+      tags:
+      - Juz
+  /juz/{index}/done:
+    post:
+      description: Menandai juz sebagai selesai (done)
+      parameters:
+      - description: Juz index (1-30)
+        in: path
+        name: index
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tandai juz selesai
+      tags:
+      - Juz
+  /juz/{index}/undone:
+    post:
+      description: Membatalkan status selesai (done) pada juz
+      parameters:
+      - description: Juz index (1-30)
+        in: path
+        name: index
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tandai juz belum selesai
       tags:
       - Juz
   /juz/{juz_id}/items:
@@ -2695,16 +3738,55 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/fiber.Error'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get today's load
       tags:
       - Load Control
+  /my-items:
+    get:
+      consumes:
+      - application/json
+      description: Get all user's memorization items grouped by juz (quran) or book.
+        Send class_id with type=quran to return only Quran items created inside that
+        class.
+      parameters:
+      - description: 'Filter by type: quran or book'
+        enum:
+        - quran
+        - book
+        in: query
+        name: type
+        type: string
+      - description: Filter Quran items by class-scoped juz
+        in: query
+        name: class_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my items
+      tags:
+      - My Items
   /teacher-request:
     post:
       consumes:

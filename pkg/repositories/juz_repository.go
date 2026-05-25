@@ -18,12 +18,51 @@ func (r *JuzRepository) Create(juz *entities.Juz) error {
 	return r.db.Create(juz).Error
 }
 
+func (r *JuzRepository) FindByID(id string) (*entities.Juz, error) {
+	var juz entities.Juz
+	err := r.db.Where("id = ?", id).First(&juz).Error
+	return &juz, err
+}
+
 func (r *JuzRepository) FindByUserAndIndex(userID string, index int) (*entities.Juz, error) {
 	var juz entities.Juz
 	err := r.db.
-		Where("user_id = ? AND index = ?", userID, index).
+		Where("user_id = ? AND index = ? AND class_id IS NULL", userID, index).
 		First(&juz).Error
 	return &juz, err
+}
+
+func (r *JuzRepository) FindByUserIndexAndClass(userID string, index int, classID string) (*entities.Juz, error) {
+	var juz entities.Juz
+	err := r.db.
+		Where("user_id = ? AND index = ? AND class_id = ?", userID, index, classID).
+		First(&juz).Error
+	return &juz, err
+}
+
+func (r *JuzRepository) ExistsByUserAndIndex(userID string, index int) (bool, error) {
+	var count int64
+	err := r.db.Model(&entities.Juz{}).
+		Where("user_id = ? AND index = ? AND class_id IS NULL", userID, index).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *JuzRepository) ExistsByUserIndexAndClass(userID string, index int, classID string) (bool, error) {
+	var count int64
+	err := r.db.Model(&entities.Juz{}).
+		Where("user_id = ? AND index = ? AND class_id = ?", userID, index, classID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *JuzRepository) FindByUserAndClass(userID string, classID string) ([]entities.Juz, error) {
+	var juzs []entities.Juz
+	err := r.db.
+		Where("user_id = ? AND class_id = ?", userID, classID).
+		Order("\"index\" ASC").
+		Find(&juzs).Error
+	return juzs, err
 }
 
 // FindByUser returns all juz entries for a user, ordered by index

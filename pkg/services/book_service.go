@@ -119,19 +119,19 @@ func calculateStability(item *entities.Item) string {
 
 // BookTreeResponse represents hierarchical modules and items for a book
 type BookTreeResponse struct {
-	BookID  string                 `json:"book_id"`
-	Title   string                 `json:"title"`
+	BookID  string                  `json:"book_id"`
+	Title   string                  `json:"title"`
 	Items   []BookItemWithStability `json:"items"` // items directly under book
-	Modules []ModuleNodeWithItems  `json:"modules"`
+	Modules []ModuleNodeWithItems   `json:"modules"`
 }
 
 type ModuleNodeWithItems struct {
-	ID          string                 `json:"id"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Order       int                    `json:"order"`
+	ID          string                  `json:"id"`
+	Title       string                  `json:"title"`
+	Description string                  `json:"description"`
+	Order       int                     `json:"order"`
 	Items       []BookItemWithStability `json:"items"`
-	Children    []ModuleNodeWithItems  `json:"children"`
+	Children    []ModuleNodeWithItems   `json:"children"`
 }
 
 // StartMemorizationResult represents the result of starting book item memorization
@@ -152,13 +152,13 @@ type AddPublishedBookToMyBookResult struct {
 
 // BookCollectionItem represents a book in user's collection
 type BookCollectionItem struct {
-	BookID        string    `json:"book_id"`
-	Title         string    `json:"title"`
-	Description   string    `json:"description"`
-	CoverImage    string    `json:"cover_image,omitempty"`
-	OwnerName     string    `json:"owner_name,omitempty"`
-	ItemCount     int       `json:"item_count"`
-	AddedAt       string    `json:"added_at"`
+	BookID      string `json:"book_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CoverImage  string `json:"cover_image,omitempty"`
+	OwnerName   string `json:"owner_name,omitempty"`
+	ItemCount   int    `json:"item_count"`
+	AddedAt     string `json:"added_at"`
 }
 
 // PublishedBookWithStats wraps a Book with additional stats for the published listing
@@ -168,30 +168,65 @@ type PublishedBookWithStats struct {
 }
 
 type bookService struct {
-	bookRepo               repositories.BookRepository
-	bookModuleRepo         repositories.BookModuleRepository
-	bookItemRepo           repositories.BookItemRepository
-	itemRepo               *repositories.ItemRepository
-	userRepo               repositories.UserRepository
-	updateRequestRepo      *repositories.BookUpdateRequestRepository
+	bookRepo          repositories.BookRepository
+	bookModuleRepo    repositories.BookModuleRepository
+	bookItemRepo      repositories.BookItemRepository
+	classBookRepo     repositories.ClassBookRepository
+	itemRepo          *repositories.ItemRepository
+	userRepo          repositories.UserRepository
+	updateRequestRepo *repositories.BookUpdateRequestRepository
 }
 
 func NewBookService(
 	bookRepo repositories.BookRepository,
 	bookModuleRepo repositories.BookModuleRepository,
 	bookItemRepo repositories.BookItemRepository,
+	classBookRepo repositories.ClassBookRepository,
 	itemRepo *repositories.ItemRepository,
 	userRepo repositories.UserRepository,
 	updateRequestRepo *repositories.BookUpdateRequestRepository,
 ) BookService {
 	return &bookService{
-		bookRepo:               bookRepo,
-		bookModuleRepo:         bookModuleRepo,
-		bookItemRepo:           bookItemRepo,
-		itemRepo:               itemRepo,
-		userRepo:               userRepo,
-		updateRequestRepo:      updateRequestRepo,
+		bookRepo:          bookRepo,
+		bookModuleRepo:    bookModuleRepo,
+		bookItemRepo:      bookItemRepo,
+		classBookRepo:     classBookRepo,
+		itemRepo:          itemRepo,
+		userRepo:          userRepo,
+		updateRequestRepo: updateRequestRepo,
 	}
+}
+
+func (s *bookService) canAccessClassBook(bookID string, ownerID uuid.UUID, userID *uuid.UUID) bool {
+	if userID == nil {
+		return false
+	}
+
+	if ownerID == *userID {
+		return true
+	}
+
+	if s.classBookRepo == nil {
+		return false
+	}
+
+	allowed, err := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
+	return err == nil && allowed
+}
+
+func (s *bookService) canViewBook(book *entities.Book, userID *uuid.UUID, role string) bool {
+	if role == "admin" {
+		return true
+	}
+
+	if s.classBookRepo != nil {
+		isClassBook, err := s.classBookRepo.IsBookAssignedToClass(book.ID.String())
+		if err == nil && isClassBook {
+			return s.canAccessClassBook(book.ID.String(), book.OwnerID, userID)
+		}
+	}
+
+	return book.Status == entities.BookStatusPublished || s.canAccessClassBook(book.ID.String(), book.OwnerID, userID)
 }
 
 // ==================== BOOK CRUD ====================
@@ -256,16 +291,8 @@ func (s *bookService) GetBookDetail(bookID string, userID *uuid.UUID, role strin
 		return nil, errors.New("book not found")
 	}
 
-	// Admin can view any book regardless of status
-	if role == "admin" {
-		return book, nil
-	}
-
-	// If not published, only owner can view
-	if book.Status != entities.BookStatusPublished {
-		if userID == nil || book.OwnerID != *userID {
-			return nil, errors.New("you don't have access to this book")
-		}
+	if !s.canViewBook(book, userID, role) {
+		return nil, errors.New("you don't have access to this book")
 	}
 
 	return book, nil
@@ -278,14 +305,8 @@ func (s *bookService) GetBookDetailWithStability(bookID string, userID *uuid.UUI
 		return nil, errors.New("book not found")
 	}
 
-	// Admin can view any book regardless of status
-	if role != "admin" {
-		// If not published, only owner can view
-		if book.Status != entities.BookStatusPublished {
-			if userID == nil || book.OwnerID != *userID {
-				return nil, errors.New("you don't have access to this book")
-			}
-		}
+	if !s.canViewBook(book, userID, role) {
+		return nil, errors.New("you don't have access to this book")
 	}
 
 	// Load all modules and items for this book (same as GetBookTree)
@@ -388,13 +409,8 @@ func (s *bookService) GetBookTree(bookID string, userID *uuid.UUID, role string)
 		return nil, errors.New("book not found")
 	}
 
-	// Admin can view any book regardless of status
-	if role == "admin" {
-		// Continue to load data
-	} else if book.Status != entities.BookStatusPublished {
-		if userID == nil || book.OwnerID != *userID {
-			return nil, errors.New("you don't have access to this book")
-		}
+	if !s.canViewBook(book, userID, role) {
+		return nil, errors.New("you don't have access to this book")
 	}
 
 	// Load all modules and items for this book
@@ -1244,8 +1260,24 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 		return nil, errors.New("book not found")
 	}
 
-	// Check if book is accessible (published or owned by user)
-	if book.Status != entities.BookStatusPublished && book.OwnerID != userID {
+	if s.classBookRepo != nil {
+		isClassBook, err := s.classBookRepo.IsBookAssignedToClass(bookID)
+		if err != nil {
+			return nil, err
+		}
+		if isClassBook {
+			allowed, err := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
+			if err != nil {
+				return nil, err
+			}
+			if !allowed {
+				return nil, errors.New("you don't have access to this book")
+			}
+		}
+		if !isClassBook && book.Status != entities.BookStatusPublished && book.OwnerID != userID {
+			return nil, errors.New("you don't have access to this book")
+		}
+	} else if book.Status != entities.BookStatusPublished && book.OwnerID != userID {
 		return nil, errors.New("you don't have access to this book")
 	}
 
@@ -1264,7 +1296,7 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 	existingItems, err := s.itemRepo.FindByOwnerAndContentRef(userID, contentRef)
 	if err == nil && len(existingItems) > 0 {
 		existingItem := &existingItems[0]
-		
+
 		// If item exists but status is 'menghafal', update to 'start'
 		// This handles items created from AddPublishedBookToMyBook
 		if existingItem.Status == entities.ItemStatusMenghafal {
@@ -1280,7 +1312,7 @@ func (s *bookService) StartItemMemorization(userID uuid.UUID, bookID, bookItemID
 				Status:     entities.ItemStatusStart,
 			}, nil
 		}
-		
+
 		// Item already exists with other status, return as-is
 		return &StartMemorizationResult{
 			ItemID:     existingItem.ID,

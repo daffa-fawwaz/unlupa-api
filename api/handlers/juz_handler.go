@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -10,6 +11,7 @@ import (
 
 	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/config"
+	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
@@ -28,12 +30,13 @@ func NewJuzHandler(s *services.HafalanService, juzRepo *repositories.JuzReposito
 
 // Create godoc
 // @Summary Create juz for hafalan
-// @Description Create a new juz entry for Quran memorization
+// @Description Create a new juz entry for Quran memorization. Send class_id to create the juz inside a joined Quran class scope.
 // @Tags Juz
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param index path int true "Juz index (1-30)"
+// @Param class_id query string false "Class ID for class-scoped Quran juz"
 // @Success 201 {object} utils.SuccessResponse{data=entities.Juz}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /juz/{index} [post]
@@ -44,7 +47,26 @@ func (h *JuzHandler) Create(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "Invalid juz index parameter", "INVALID_PARAMETER", nil)
 	}
 
-	juz, err := h.service.CreateJuz(userID, juzIndex)
+	var classID *uuid.UUID
+	classIDStr := strings.TrimSpace(c.Query("class_id"))
+	if classIDStr == "" && len(c.Body()) > 0 {
+		var req struct {
+			ClassID string `json:"class_id"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return utils.Error(c, fiber.StatusBadRequest, "Invalid request body", "INVALID_REQUEST_BODY", nil)
+		}
+		classIDStr = strings.TrimSpace(req.ClassID)
+	}
+	if classIDStr != "" {
+		parsedClassID, err := uuid.Parse(classIDStr)
+		if err != nil {
+			return utils.Error(c, fiber.StatusBadRequest, "Invalid class_id", "INVALID_PARAMETER", nil)
+		}
+		classID = &parsedClassID
+	}
+
+	juz, err := h.service.CreateJuz(userID, juzIndex, classID)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "CREATE_JUZ_FAILED", nil)
 	}
@@ -57,6 +79,7 @@ func (h *JuzHandler) Create(c *fiber.Ctx) error {
 func (h *JuzHandler) invalidateJuzCache(c *fiber.Ctx, userID uuid.UUID) {
 	ctx := c.Context()
 	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s:*", userID.String()))
 }
 
 // Activate godoc
@@ -199,6 +222,7 @@ func (h *JuzHandler) MarkUndone(c *fiber.Ctx) error {
 // JuzWithStatusCount response struct
 type JuzWithStatusCount struct {
 	JuzID      uuid.UUID  `json:"juz_id"`
+	ClassID    *uuid.UUID `json:"class_id,omitempty"`
 	JuzIndex   int        `json:"juz_index"`
 	IsActive   bool       `json:"is_active"`
 	IsDone     bool       `json:"is_done"`
@@ -212,26 +236,37 @@ type JuzWithStatusCount struct {
 
 // GetMyJuz godoc
 // @Summary Get my juz list with item status counts
-// @Description Get all juz entries with counts per status (menghafal, interval, fsrs_active, graduate)
+// @Description Get all juz entries with counts per status. Send class_id to return only juz created inside that Quran class.
 // @Tags Juz
 // @Produce json
 // @Security BearerAuth
+// @Param class_id query string false "Filter by class-scoped Quran juz"
 // @Success 200 {object} utils.SuccessResponse
 // @Failure 401 {object} utils.ErrorResponse
 // @Failure 500 {object} utils.ErrorResponse
 // @Router /juz [get]
 func (h *JuzHandler) GetMyJuz(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
+	classID := strings.TrimSpace(c.Query("class_id"))
 
 	// Try cache first
-	cacheKey := fmt.Sprintf("juz:list:%s", userID.String())
+	cacheKey := fmt.Sprintf("juz:list:%s:%s", userID.String(), classID)
 	var cached []JuzWithStatusCount
 	if h.cache.Get(c.Context(), cacheKey, &cached) {
 		return utils.Success(c, fiber.StatusOK, "juz fetched successfully", cached, nil)
 	}
 
-	// Fetch all juz for this user
-	juzs, err := h.juzRepo.FindByUser(userID.String())
+	var juzs []entities.Juz
+	var err error
+	if classID != "" {
+		if _, err := uuid.Parse(classID); err != nil {
+			return utils.Error(c, fiber.StatusBadRequest, "Invalid class_id", "INVALID_PARAMETER", nil)
+		}
+		juzs, err = h.juzRepo.FindByUserAndClass(userID.String(), classID)
+	} else {
+		// Fetch all juz for this user
+		juzs, err = h.juzRepo.FindByUser(userID.String())
+	}
 	if err != nil {
 		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_JUZ_FAILED", nil)
 	}
@@ -284,6 +319,7 @@ func (h *JuzHandler) GetMyJuz(c *fiber.Ctx) error {
 	for _, j := range juzs {
 		entry := JuzWithStatusCount{
 			JuzID:    j.ID,
+			ClassID:  j.ClassID,
 			JuzIndex: j.Index,
 			IsActive: j.IsActive,
 			IsDone:   j.IsDone,

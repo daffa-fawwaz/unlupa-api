@@ -26,11 +26,11 @@ func RegisterBookRoutes(
 	books.Get("/published/:id", bookHandler.GetPublishedBookDetail)
 	books.Post("/published/:id/add-to-my-books", bookHandler.AddPublishedBookToMyBook)
 	books.Post("/published/:id/copy-to-draft", bookHandler.CopyPublishedBookToDraft)
-	
+
 	// My Book Collection
 	books.Get("/my-collection", bookHandler.GetMyBookCollection)
 	books.Delete("/my-collection/:id", bookHandler.RemoveFromMyBookCollection)
-	
+
 	books.Get("/:id/tree", bookHandler.GetBookTree)
 	books.Post("/:id/request-update", bookHandler.RequestBookUpdate)
 	books.Get("/:id/update-requests", bookHandler.GetBookUpdateRequests)

@@ -19,9 +19,13 @@ type Class struct {
 	GuruID      uuid.UUID `gorm:"type:uuid;not null;index" json:"guru_id"`
 	Name        string    `gorm:"size:100;not null" json:"name"`
 	Description string    `gorm:"type:text" json:"description"`
+	CoverImage  string    `gorm:"size:500" json:"cover_image"`
 	ClassCode   string    `gorm:"size:20;uniqueIndex;not null" json:"class_code"`
 	Type        string    `gorm:"size:20;not null;default:'quran'" json:"type"` // quran | book
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
+
+	OwnerName    string `gorm:"-" json:"owner_name"`
+	StudentCount int64  `gorm:"-" json:"student_count"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

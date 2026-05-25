@@ -22,6 +22,15 @@ func (r *JuzItemRepository) DeleteByItemID(itemID string) error {
 	return r.db.Where("item_id = ?", itemID).Delete(&entities.JuzItem{}).Error
 }
 
+func (r *JuzItemRepository) FindItemIDsByJuzIDs(juzIDs []string) ([]string, error) {
+	var itemIDs []string
+	err := r.db.
+		Model(&entities.JuzItem{}).
+		Where("juz_id IN ?", juzIDs).
+		Pluck("item_id", &itemIDs).Error
+	return itemIDs, err
+}
+
 // FindJuzIndexByItemID returns the juz index for a given item ID
 func (r *JuzItemRepository) FindJuzIndexByItemID(itemID string) (int, error) {
 	var result struct {
@@ -66,19 +75,21 @@ func (r *JuzItemRepository) FindJuzIndexByItemIDs(itemIDs []string) (map[string]
 type JuzInfo struct {
 	JuzID    string
 	JuzIndex int
+	ClassID  *string
 }
 
 // FindJuzInfoByItemIDs returns a map of item_id -> JuzInfo for multiple items
 func (r *JuzItemRepository) FindJuzInfoByItemIDs(itemIDs []string) (map[string]JuzInfo, error) {
 	type row struct {
-		ItemID string `gorm:"column:item_id"`
-		JuzID  string `gorm:"column:juz_id"`
-		Index  int    `gorm:"column:index"`
+		ItemID  string  `gorm:"column:item_id"`
+		JuzID   string  `gorm:"column:juz_id"`
+		Index   int     `gorm:"column:index"`
+		ClassID *string `gorm:"column:class_id"`
 	}
 	var rows []row
 	err := r.db.
 		Table("juz_items").
-		Select("juz_items.item_id, juz_items.juz_id, juzs.index").
+		Select("juz_items.item_id, juz_items.juz_id, juzs.index, juzs.class_id").
 		Joins("JOIN juzs ON juzs.id = juz_items.juz_id").
 		Where("juz_items.item_id IN ?", itemIDs).
 		Scan(&rows).Error
@@ -87,7 +98,7 @@ func (r *JuzItemRepository) FindJuzInfoByItemIDs(itemIDs []string) (map[string]J
 	}
 	result := make(map[string]JuzInfo)
 	for _, r := range rows {
-		result[r.ItemID] = JuzInfo{JuzID: r.JuzID, JuzIndex: r.Index}
+		result[r.ItemID] = JuzInfo{JuzID: r.JuzID, JuzIndex: r.Index, ClassID: r.ClassID}
 	}
 	return result, nil
 }

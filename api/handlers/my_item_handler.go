@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,12 +24,13 @@ func NewMyItemHandler(service *services.MyItemService, c *cache.Cache) *MyItemHa
 
 // GetMyItems godoc
 // @Summary Get my items
-// @Description Get all user's memorization items grouped by juz (quran) or book (book)
+// @Description Get all user's memorization items grouped by juz (quran) or book. Send class_id with type=quran to return only Quran items created inside that class.
 // @Tags My Items
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param type query string false "Filter by type: quran or book" Enums(quran, book)
+// @Param class_id query string false "Filter Quran items by class-scoped juz"
 // @Success 200 {object} utils.SuccessResponse
 // @Failure 401 {object} utils.ErrorResponse
 // @Failure 500 {object} utils.ErrorResponse
@@ -43,16 +45,22 @@ func (h *MyItemHandler) GetMyItems(c *fiber.Ctx) error {
 	if filterType == "" {
 		filterType = "all"
 	}
+	classID := strings.TrimSpace(c.Query("class_id"))
+	if classID != "" {
+		if _, err := uuid.Parse(classID); err != nil {
+			return utils.Error(c, fiber.StatusBadRequest, "Invalid class_id", "INVALID_PARAMETER", nil)
+		}
+	}
 
 	// Try cache first
-	cacheKey := fmt.Sprintf("myitems:%s:%s", userID.String(), filterType)
+	cacheKey := fmt.Sprintf("myitems:%s:%s:%s", userID.String(), filterType, classID)
 	switch filterType {
 	case "quran":
 		var cached *services.MyItemsQuranResponse
 		if h.cache.Get(c.Context(), cacheKey, &cached) {
 			return utils.Success(c, fiber.StatusOK, "quran items fetched successfully", cached, nil)
 		}
-		result, err := h.service.GetMyQuranItems(userID)
+		result, err := h.service.GetMyQuranItems(userID, classID)
 		if err != nil {
 			return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_ITEMS_FAILED", nil)
 		}
@@ -82,7 +90,7 @@ func (h *MyItemHandler) GetMyItems(c *fiber.Ctx) error {
 			return utils.Success(c, fiber.StatusOK, "items fetched successfully", cached, nil)
 		}
 
-		quranResult, err := h.service.GetMyQuranItems(userID)
+		quranResult, err := h.service.GetMyQuranItems(userID, classID)
 		if err != nil {
 			return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_ITEMS_FAILED", nil)
 		}
@@ -98,4 +106,3 @@ func (h *MyItemHandler) GetMyItems(c *fiber.Ctx) error {
 		return utils.Success(c, fiber.StatusOK, "items fetched successfully", combined, nil)
 	}
 }
-

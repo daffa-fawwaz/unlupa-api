@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
@@ -17,10 +19,18 @@ type ItemStatusHandler struct {
 	bookRepo     repositories.BookRepository
 	bookItemRepo repositories.BookItemRepository
 	itemRepo     *repositories.ItemRepository
+	cache        *cache.Cache
 }
 
-func NewItemStatusHandler(s *services.ItemStatusService, juzItemRepo *repositories.JuzItemRepository, bookRepo repositories.BookRepository, bookItemRepo repositories.BookItemRepository, itemRepo *repositories.ItemRepository) *ItemStatusHandler {
-	return &ItemStatusHandler{service: s, juzItemRepo: juzItemRepo, bookRepo: bookRepo, bookItemRepo: bookItemRepo, itemRepo: itemRepo}
+func NewItemStatusHandler(s *services.ItemStatusService, juzItemRepo *repositories.JuzItemRepository, bookRepo repositories.BookRepository, bookItemRepo repositories.BookItemRepository, itemRepo *repositories.ItemRepository, c *cache.Cache) *ItemStatusHandler {
+	return &ItemStatusHandler{service: s, juzItemRepo: juzItemRepo, bookRepo: bookRepo, bookItemRepo: bookItemRepo, itemRepo: itemRepo, cache: c}
+}
+
+func (h *ItemStatusHandler) invalidateItemCaches(c *fiber.Ctx, userID uuid.UUID) {
+	ctx := c.Context()
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
+	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s:*", userID.String()))
 }
 
 // StartIntervalRequest represents start interval request
@@ -56,6 +66,8 @@ func (h *ItemStatusHandler) StartInterval(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "START_INTERVAL_FAILED", nil)
 	}
+
+	h.invalidateItemCaches(c, userID)
 
 	return utils.Success(c, fiber.StatusOK, "Item moved to interval phase with recurring review", item, nil)
 }
@@ -129,6 +141,8 @@ func (h *ItemStatusHandler) ReviewInterval(c *fiber.Ctx) error {
 		ReviewCount:          result.Item.ReviewCount,
 		ContentRef:           result.Item.ContentRef,
 	}
+
+	h.invalidateItemCaches(c, userID)
 
 	return utils.Success(c, fiber.StatusOK, "Interval review submitted", resp, nil)
 }
@@ -260,6 +274,7 @@ func (h *ItemStatusHandler) UpdateIntervalDays(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_INTERVAL_DAYS_FAILED", nil)
 	}
+	h.invalidateItemCaches(c, userID)
 	return utils.Success(c, fiber.StatusOK, "Interval days updated", item, nil)
 }
 
@@ -306,7 +321,7 @@ func (h *ItemStatusHandler) GetIntervalStats(c *fiber.Ctx) error {
 
 // ActivateToFSRS godoc
 // @Summary Activate item to FSRS phase
-// @Description Move item from interval to fsrs_active phase (user decision). For book items: moves from 'start' to 'fsrs_active'.
+// @Description Move item from interval to fsrs_active phase (user decision). For class book items, only students who joined a class containing the book can activate FSRS.
 // @Tags Item Status
 // @Accept json
 // @Produce json
@@ -326,6 +341,8 @@ func (h *ItemStatusHandler) ActivateToFSRS(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ACTIVATE_FSRS_FAILED", nil)
 	}
+
+	h.invalidateItemCaches(c, userID)
 
 	return utils.Success(c, fiber.StatusOK, "Item moved to FSRS active phase", item, nil)
 }
@@ -392,7 +409,7 @@ func (h *ItemStatusHandler) GetDeadlines(c *fiber.Ctx) error {
 func (h *ItemStatusHandler) DeactivateItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	itemIDStr := c.Params("item_id")
-	
+
 	itemID, err := uuid.Parse(itemIDStr)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
@@ -415,12 +432,15 @@ func (h *ItemStatusHandler) DeactivateItem(c *fiber.Ctx) error {
 					if err != nil {
 						return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DEACTIVATE_FAILED", nil)
 					}
+					h.invalidateItemCaches(c, userID)
 					return utils.Success(c, fiber.StatusOK, "Item deactivated successfully", item, nil)
 				}
 			}
 		}
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DEACTIVATE_FAILED", nil)
 	}
+
+	h.invalidateItemCaches(c, userID)
 
 	return utils.Success(c, fiber.StatusOK, "Item deactivated successfully", item, nil)
 }
@@ -439,7 +459,7 @@ func (h *ItemStatusHandler) DeactivateItem(c *fiber.Ctx) error {
 func (h *ItemStatusHandler) ReactivateItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	itemIDStr := c.Params("item_id")
-	
+
 	itemID, err := uuid.Parse(itemIDStr)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, "Invalid item_id", "INVALID_PARAMETER", nil)
@@ -462,12 +482,15 @@ func (h *ItemStatusHandler) ReactivateItem(c *fiber.Ctx) error {
 					if err != nil {
 						return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REACTIVATE_FAILED", nil)
 					}
+					h.invalidateItemCaches(c, userID)
 					return utils.Success(c, fiber.StatusOK, "Item reactivated successfully", item, nil)
 				}
 			}
 		}
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REACTIVATE_FAILED", nil)
 	}
+
+	h.invalidateItemCaches(c, userID)
 
 	return utils.Success(c, fiber.StatusOK, "Item reactivated successfully", item, nil)
 }

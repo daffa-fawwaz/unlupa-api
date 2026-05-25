@@ -22,6 +22,11 @@ func RegisterClassRoutes(
 	classes.Get("/joined", classHandler.GetMyJoinedClasses)
 	classes.Delete("/:id/leave", classHandler.LeaveClass)
 
+	// ==================== SHARED ENDPOINTS ====================
+	// These can be accessed by members of the class (student/teacher)
+	classes.Get("/:id/books", classHandler.GetClassBooks)
+	classes.Get("/:id", classHandler.GetClassDetail)
+
 	// ==================== TEACHER/ADMIN ENDPOINTS ====================
 	// These can only be accessed by teachers and admins
 	teacher := classes.Group("", middlewares.TeacherOnly())
@@ -44,10 +49,4 @@ func RegisterClassRoutes(
 	teacher.Get("/:id/graduations/pending", classHandler.GetPendingGraduations)
 	teacher.Post("/:id/graduations/:item_id/approve", classHandler.ApproveGraduation)
 	teacher.Post("/:id/graduations/:item_id/reject", classHandler.RejectGraduation)
-
-	// ==================== SHARED ENDPOINTS ====================
-	// These can be accessed by members of the class (student/teacher)
-	classes.Get("/:id", classHandler.GetClassDetail)
-	classes.Get("/:id/books", classHandler.GetClassBooks)
 }
-

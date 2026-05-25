@@ -36,6 +36,7 @@ func (h *ClassHandler) CreateClass(c *fiber.Ctx) error {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		CoverImage  string `json:"cover_image"`
 		Type        string `json:"type"` // quran | book
 	}
 
@@ -43,7 +44,7 @@ func (h *ClassHandler) CreateClass(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
 	}
 
-	class, err := h.classSvc.CreateClass(userID, req.Name, req.Description, req.Type)
+	class, err := h.classSvc.CreateClass(userID, req.Name, req.Description, req.Type, req.CoverImage)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "CREATE_CLASS_FAILED", nil)
 	}
@@ -215,7 +216,7 @@ func (h *ClassHandler) RemoveBookFromClass(c *fiber.Ctx) error {
 
 // GetStudentProgress godoc
 // @Summary Get student progress
-// @Description Get progress of all students in quran-type class
+// @Description Get progress of all students for class-scoped items. Quran classes use juz created with class_id; book classes use books assigned to the class.
 // @Tags Class
 // @Accept json
 // @Produce json
@@ -338,7 +339,7 @@ func (h *ClassHandler) GetMyJoinedClasses(c *fiber.Ctx) error {
 
 // GetClassBooks godoc
 // @Summary Get class books
-// @Description Get all books in a book-type class
+// @Description Get all books in a book-type class. Teacher and students who joined the class can access this endpoint.
 // @Tags Class
 // @Accept json
 // @Produce json
@@ -365,6 +366,7 @@ func (h *ClassHandler) GetClassBooks(c *fiber.Ctx) error {
 type CreateClassRequest struct {
 	Name        string `json:"name" example:"Kelas Tajwid A"`
 	Description string `json:"description" example:"Belajar tajwid dari dasar"`
+	CoverImage  string `json:"cover_image" example:"https://example.com/class-cover.jpg"`
 	Type        string `json:"type" example:"book" enums:"quran,book"`
 }
 
@@ -390,7 +392,7 @@ type JoinClassRequest struct {
 
 // GetPendingGraduations godoc
 // @Summary Get pending graduations
-// @Description Teacher gets all items pending graduation approval in a class
+// @Description Teacher gets all Quran items pending graduation approval in a class. Only items created in juz with this class_id are returned.
 // @Tags Class
 // @Accept json
 // @Produce json
@@ -414,7 +416,7 @@ func (h *ClassHandler) GetPendingGraduations(c *fiber.Ctx) error {
 
 // ApproveGraduation godoc
 // @Summary Approve graduation
-// @Description Teacher approves an item for graduation
+// @Description Teacher approves an item for graduation. The item must belong to a student in this Quran class and be created in a juz with this class_id.
 // @Tags Class
 // @Accept json
 // @Produce json
@@ -439,7 +441,7 @@ func (h *ClassHandler) ApproveGraduation(c *fiber.Ctx) error {
 
 // RejectGraduation godoc
 // @Summary Reject graduation
-// @Description Teacher rejects an item for graduation (returns to fsrs_active)
+// @Description Teacher rejects an item for graduation (returns to fsrs_active). The item must belong to this Quran class scope.
 // @Tags Class
 // @Accept json
 // @Produce json
