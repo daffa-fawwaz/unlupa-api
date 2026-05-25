@@ -66,8 +66,8 @@ func NewDailyTaskHandler(
 // @Security BearerAuth
 // @Param limit query int false "Limit number of tasks" default(0)
 // @Success 200 {object} map[string]interface{}
-// @Failure 401 {object} fiber.Error
-// @Failure 500 {object} fiber.Error
+// @Failure 401 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
 // @Router /daily-tasks/generate [post]
 func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 	userID, ok := c.Locals("user_id").(uuid.UUID)
@@ -118,8 +118,8 @@ func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {array} DailyTaskResponse
-// @Failure 401 {object} fiber.Error
-// @Failure 500 {object} fiber.Error
+// @Failure 401 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
 // @Router /daily-tasks/today [get]
 func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	userID, ok := c.Locals("user_id").(uuid.UUID)

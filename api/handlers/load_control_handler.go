@@ -39,8 +39,8 @@ func NewLoadControlHandler(
 // @Security BearerAuth
 // @Param limit query int false "Limit number of items" default(10)
 // @Success 200 {array} LoadControlResponse
-// @Failure 401 {object} fiber.Error
-// @Failure 500 {object} fiber.Error
+// @Failure 401 {object} utils.ErrorResponse
+// @Failure 500 {object} utils.ErrorResponse
 // @Router /load/today [get]
 func (h *LoadControlHandler) Today(c *fiber.Ctx) error {
 

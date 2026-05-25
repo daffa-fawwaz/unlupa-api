@@ -36,7 +36,7 @@ func NewGraduationPreEngineHandler(
 // @Security BearerAuth
 // @Param request body GraduationDecisionRequest true "Graduation decision"
 // @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} fiber.Error
+// @Failure 400 {object} utils.ErrorResponse
 // @Router /graduation/decide [post]
 func (h *GraduationPreEngineHandler) Decide(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)

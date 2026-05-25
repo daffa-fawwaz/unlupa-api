@@ -15,7 +15,7 @@ import (
 
 type ClassService interface {
 	// Teacher methods
-	CreateClass(teacherID uuid.UUID, name, description, classType string) (*entities.Class, error)
+	CreateClass(teacherID uuid.UUID, name, description, classType, coverImage string) (*entities.Class, error)
 	GetMyClasses(teacherID uuid.UUID) ([]entities.Class, error)
 	GetClassDetail(classID string, userID uuid.UUID) (*entities.Class, error)
 	UpdateClass(classID string, teacherID uuid.UUID, name, description string, isActive *bool) (*entities.Class, error)
@@ -35,8 +35,8 @@ type ClassService interface {
 	GetClassMembers(classID string, userID uuid.UUID) ([]MemberInfo, error)
 }
 
-// ItemDetail represents detailed information about a single hafalan item
-// @Description Detail of a single hafalan item including its current phase/status
+// ItemDetail represents detailed information about a single class item
+// @Description Detail of a single class-scoped item including its current phase/status
 type ItemDetail struct {
 	// UUID of the item
 	ItemID uuid.UUID `json:"item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
@@ -56,8 +56,8 @@ type ItemDetail struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// StudentProgress represents the progress of a student in a Quran class
-// @Description Progress data for a student in a Quran-type class, showing hafalan statistics and item details
+// StudentProgress represents the progress of a student in a class
+// @Description Progress data for a student in a class, showing class-scoped item statistics and item details
 type StudentProgress struct {
 	// UUID of the student
 	UserID uuid.UUID `json:"user_id" example:"550e8400-e29b-41d4-a716-446655440000"`
@@ -67,6 +67,8 @@ type StudentProgress struct {
 	FullName string `json:"full_name" example:"Ahmad Abdullah"`
 	// Total number of hafalan items the student has
 	TotalItems int `json:"total_items" example:"30"`
+	// Number of book items in 'start' status
+	Start int `json:"start" example:"3"`
 	// Number of items in 'menghafal' status (currently memorizing)
 	Menghafal int `json:"menghafal" example:"5"`
 	// Number of items in 'interval' status (waiting for interval period to complete)
@@ -77,6 +79,8 @@ type StudentProgress struct {
 	PendingGraduate int `json:"pending_graduate" example:"2"`
 	// Number of items in 'graduate' status (mastered/completed memorization)
 	Graduate int `json:"graduate" example:"5"`
+	// Number of book items in 'inactive' status
+	Inactive int `json:"inactive" example:"1"`
 	// Overall progress percentage (graduate / total_items * 100)
 	ProgressPct float64 `json:"progress_pct" example:"16.67"`
 	// Detailed list of all hafalan items with their current status
@@ -124,6 +128,75 @@ type classService struct {
 	bookRepo        repositories.BookRepository
 	userRepo        repositories.UserRepository
 	itemRepo        *repositories.ItemRepository
+	juzRepo         *repositories.JuzRepository
+	juzItemRepo     *repositories.JuzItemRepository
+}
+
+func itemBelongsToClassBooks(item entities.Item, classBooks []entities.ClassBook) bool {
+	if item.SourceType != "book" {
+		return false
+	}
+
+	bookID, ok := bookIDFromItemContentRef(item.ContentRef)
+	if !ok {
+		return false
+	}
+
+	for _, classBook := range classBooks {
+		if classBook.BookID.String() == bookID {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *classService) classQuranItemIDSet(userID uuid.UUID, classID string) (map[uuid.UUID]bool, error) {
+	itemSet := map[uuid.UUID]bool{}
+
+	classJuzs, err := s.juzRepo.FindByUserAndClass(userID.String(), classID)
+	if err != nil {
+		return itemSet, err
+	}
+	if len(classJuzs) == 0 {
+		return itemSet, nil
+	}
+
+	juzIDs := make([]string, 0, len(classJuzs))
+	for _, juz := range classJuzs {
+		juzIDs = append(juzIDs, juz.ID.String())
+	}
+
+	itemIDs, err := s.juzItemRepo.FindItemIDsByJuzIDs(juzIDs)
+	if err != nil {
+		return itemSet, err
+	}
+	for _, itemID := range itemIDs {
+		parsedItemID, err := uuid.Parse(itemID)
+		if err == nil {
+			itemSet[parsedItemID] = true
+		}
+	}
+
+	return itemSet, nil
+}
+
+func (s *classService) enrichClassSummary(class *entities.Class) error {
+	teacher, err := s.userRepo.FindByID(class.GuruID.String())
+	if err == nil {
+		class.OwnerName = teacher.FullName
+		if class.OwnerName == "" {
+			class.OwnerName = teacher.Email
+		}
+	}
+
+	studentCount, err := s.classMemberRepo.CountByClassID(class.ID.String())
+	if err != nil {
+		return err
+	}
+	class.StudentCount = studentCount
+
+	return nil
 }
 
 func NewClassService(
@@ -133,6 +206,8 @@ func NewClassService(
 	bookRepo repositories.BookRepository,
 	userRepo repositories.UserRepository,
 	itemRepo *repositories.ItemRepository,
+	juzRepo *repositories.JuzRepository,
+	juzItemRepo *repositories.JuzItemRepository,
 ) ClassService {
 	return &classService{
 		classRepo:       classRepo,
@@ -141,6 +216,8 @@ func NewClassService(
 		bookRepo:        bookRepo,
 		userRepo:        userRepo,
 		itemRepo:        itemRepo,
+		juzRepo:         juzRepo,
+		juzItemRepo:     juzItemRepo,
 	}
 }
 
@@ -174,7 +251,7 @@ func (s *classService) generateClassCode() (string, error) {
 
 // ==================== TEACHER METHODS ====================
 
-func (s *classService) CreateClass(teacherID uuid.UUID, name, description, classType string) (*entities.Class, error) {
+func (s *classService) CreateClass(teacherID uuid.UUID, name, description, classType, coverImage string) (*entities.Class, error) {
 	if name == "" {
 		return nil, errors.New("class name is required")
 	}
@@ -192,6 +269,7 @@ func (s *classService) CreateClass(teacherID uuid.UUID, name, description, class
 		GuruID:      teacherID,
 		Name:        name,
 		Description: description,
+		CoverImage:  coverImage,
 		ClassCode:   classCode,
 		Type:        classType,
 		IsActive:    true,
@@ -201,11 +279,26 @@ func (s *classService) CreateClass(teacherID uuid.UUID, name, description, class
 		return nil, err
 	}
 
+	if err := s.enrichClassSummary(class); err != nil {
+		return nil, err
+	}
+
 	return class, nil
 }
 
 func (s *classService) GetMyClasses(teacherID uuid.UUID) ([]entities.Class, error) {
-	return s.classRepo.FindByTeacher(teacherID.String())
+	classes, err := s.classRepo.FindByTeacher(teacherID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range classes {
+		if err := s.enrichClassSummary(&classes[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return classes, nil
 }
 
 func (s *classService) GetClassDetail(classID string, userID uuid.UUID) (*entities.Class, error) {
@@ -340,8 +433,12 @@ func (s *classService) GetStudentProgress(classID string, teacherID uuid.UUID) (
 		return nil, errors.New("you don't have permission to view this class progress")
 	}
 
-	if class.Type != entities.ClassTypeQuran {
-		return nil, errors.New("progress tracking only available for quran-type classes")
+	var classBooks []entities.ClassBook
+	if class.Type == entities.ClassTypeBook {
+		classBooks, err = s.classBookRepo.FindByClassID(classID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	members, err := s.classMemberRepo.FindByClassID(classID)
@@ -354,6 +451,14 @@ func (s *classService) GetStudentProgress(classID string, teacherID uuid.UUID) (
 		user, err := s.userRepo.FindByID(member.UserID.String())
 		if err != nil {
 			continue
+		}
+
+		classQuranItemIDs := map[uuid.UUID]bool{}
+		if class.Type == entities.ClassTypeQuran {
+			classQuranItemIDs, err = s.classQuranItemIDSet(member.UserID, classID)
+			if err != nil {
+				continue
+			}
 		}
 
 		// Get item stats for this user
@@ -371,39 +476,47 @@ func (s *classService) GetStudentProgress(classID string, teacherID uuid.UUID) (
 		}
 
 		for _, item := range items {
-			if item.SourceType == "quran" {
-				progress.TotalItems++
-
-				// Add item detail
-				itemDetail := ItemDetail{
-					ItemID:     item.ID,
-					ContentRef: item.ContentRef,
-					Status:     item.Status,
-					CreatedAt:  item.CreatedAt,
+			if class.Type == entities.ClassTypeQuran {
+				if !classQuranItemIDs[item.ID] {
+					continue
 				}
-
-				// Add phase-specific fields
-				switch item.Status {
-				case entities.ItemStatusMenghafal:
-					progress.Menghafal++
-				case entities.ItemStatusInterval:
-					progress.Interval++
-					itemDetail.IntervalDays = item.IntervalDays
-					itemDetail.IntervalEndAt = item.IntervalEndAt
-				case entities.ItemStatusFSRSActive:
-					progress.FSRSActive++
-					itemDetail.NextReviewAt = item.NextReviewAt
-					itemDetail.Stability = item.Stability
-				case entities.ItemStatusPendingGraduate:
-					progress.PendingGraduate++
-					itemDetail.NextReviewAt = item.NextReviewAt
-					itemDetail.Stability = item.Stability
-				case entities.ItemStatusGraduate:
-					progress.Graduate++
-				}
-
-				progress.Items = append(progress.Items, itemDetail)
+			} else if !itemBelongsToClassBooks(item, classBooks) {
+				continue
 			}
+
+			progress.TotalItems++
+
+			itemDetail := ItemDetail{
+				ItemID:     item.ID,
+				ContentRef: item.ContentRef,
+				Status:     item.Status,
+				CreatedAt:  item.CreatedAt,
+			}
+
+			switch item.Status {
+			case entities.ItemStatusStart:
+				progress.Start++
+			case entities.ItemStatusMenghafal:
+				progress.Menghafal++
+			case entities.ItemStatusInterval:
+				progress.Interval++
+				itemDetail.IntervalDays = item.IntervalDays
+				itemDetail.IntervalEndAt = item.IntervalEndAt
+			case entities.ItemStatusFSRSActive:
+				progress.FSRSActive++
+				itemDetail.NextReviewAt = item.NextReviewAt
+				itemDetail.Stability = item.Stability
+			case entities.ItemStatusPendingGraduate:
+				progress.PendingGraduate++
+				itemDetail.NextReviewAt = item.NextReviewAt
+				itemDetail.Stability = item.Stability
+			case entities.ItemStatusGraduate:
+				progress.Graduate++
+			case entities.ItemStatusInactive:
+				progress.Inactive++
+			}
+
+			progress.Items = append(progress.Items, itemDetail)
 		}
 
 		if progress.TotalItems > 0 {
@@ -563,6 +676,11 @@ func (s *classService) GetPendingGraduations(classID string, teacherID uuid.UUID
 			continue
 		}
 
+		classQuranItemIDs, err := s.classQuranItemIDSet(member.UserID, classID)
+		if err != nil {
+			continue
+		}
+
 		// Get pending graduate items for this user
 		items, err := s.itemRepo.FindByOwnerAndStatus(member.UserID, entities.ItemStatusPendingGraduate)
 		if err != nil {
@@ -570,7 +688,7 @@ func (s *classService) GetPendingGraduations(classID string, teacherID uuid.UUID
 		}
 
 		for _, item := range items {
-			if item.SourceType == "quran" {
+			if item.SourceType == "quran" && classQuranItemIDs[item.ID] {
 				// Calculate last interval days
 				intervalDays := 0
 				if item.NextReviewAt != nil && item.LastReviewAt != nil {
@@ -631,6 +749,11 @@ func (s *classService) ApproveGraduation(classID string, teacherID uuid.UUID, it
 		return errors.New("item owner is not a member of this class")
 	}
 
+	classQuranItemIDs, err := s.classQuranItemIDSet(item.OwnerID, classID)
+	if err != nil || !classQuranItemIDs[item.ID] {
+		return errors.New("item is not part of this class")
+	}
+
 	// Approve graduation
 	now := time.Now().In(config.AppLocation)
 	item.Status = entities.ItemStatusGraduate
@@ -676,9 +799,13 @@ func (s *classService) RejectGraduation(classID string, teacherID uuid.UUID, ite
 		return errors.New("item owner is not a member of this class")
 	}
 
+	classQuranItemIDs, err := s.classQuranItemIDSet(item.OwnerID, classID)
+	if err != nil || !classQuranItemIDs[item.ID] {
+		return errors.New("item is not part of this class")
+	}
+
 	// Reject - return to fsrs_active
 	item.Status = entities.ItemStatusFSRSActive
 
 	return s.itemRepo.Update(item)
 }
-

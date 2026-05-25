@@ -46,7 +46,7 @@ type ReviewItemResponse struct {
 
 // ReviewItem godoc
 // @Summary Review an item
-// @Description Submit a review rating for a hafalan item
+// @Description Submit a review rating for a hafalan item. Class book items can only be reviewed by students who joined a class containing the book.
 // @Tags Item Review
 // @Accept json
 // @Produce json
@@ -106,6 +106,7 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 	// Invalidate caches
 	ctx := c.Context()
 	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s:*", userID.String()))
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
 	date := time.Now().In(config.AppLocation).Format("2006-01-02")
 	h.cache.Delete(ctx, fmt.Sprintf("daily:%s:%s", userID.String(), date))

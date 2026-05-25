@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,16 +16,49 @@ import (
 type ItemStatusService struct {
 	itemRepo           *repositories.ItemRepository
 	intervalReviewRepo *repositories.IntervalReviewLogRepository
+	classBookRepo      repositories.ClassBookRepository
 }
 
 func NewItemStatusService(
 	itemRepo *repositories.ItemRepository,
 	intervalReviewRepo *repositories.IntervalReviewLogRepository,
+	classBookRepo repositories.ClassBookRepository,
 ) *ItemStatusService {
 	return &ItemStatusService{
 		itemRepo:           itemRepo,
 		intervalReviewRepo: intervalReviewRepo,
+		classBookRepo:      classBookRepo,
 	}
+}
+
+func bookIDFromItemContentRef(contentRef string) (string, bool) {
+	parts := strings.Split(contentRef, ":")
+	if len(parts) != 4 || parts[0] != "book" || parts[2] != "item" {
+		return "", false
+	}
+	return parts[1], true
+}
+
+func (s *ItemStatusService) canAccessBookItem(item *entities.Item, userID uuid.UUID) bool {
+	if item.SourceType != "book" {
+		return true
+	}
+
+	bookID, ok := bookIDFromItemContentRef(item.ContentRef)
+	if !ok || s.classBookRepo == nil {
+		return false
+	}
+
+	isClassBook, err := s.classBookRepo.IsBookAssignedToClass(bookID)
+	if err != nil {
+		return false
+	}
+	if !isClassBook {
+		return true
+	}
+
+	allowed, err := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
+	return err == nil && allowed
 }
 
 // StartInterval moves item from menghafal → interval (recurring review)
@@ -37,6 +71,9 @@ func (s *ItemStatusService) StartInterval(itemID uuid.UUID, userID uuid.UUID, in
 	// Validate ownership
 	if item.OwnerID != userID {
 		return nil, errors.New("unauthorized")
+	}
+	if !s.canAccessBookItem(item, userID) {
+		return nil, errors.New("you don't have access to this book item")
 	}
 
 	// Validate current status: allow from 'menghafal' or 'fsrs_active'
@@ -244,6 +281,9 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 
 	if item.OwnerID != userID {
 		return nil, errors.New("unauthorized")
+	}
+	if !s.canAccessBookItem(item, userID) {
+		return nil, errors.New("you don't have access to this book item")
 	}
 
 	// For book items: allow activation from 'start' status

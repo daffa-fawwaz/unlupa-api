@@ -31,6 +31,7 @@ type BookItemDetail struct {
 type QuranGroup struct {
 	JuzIndex  int               `json:"juz_index"`
 	JuzID     string            `json:"juz_id"`
+	ClassID   *string           `json:"class_id,omitempty"`
 	ItemCount int               `json:"item_count"`
 	Items     []QuranItemDetail `json:"items"`
 }
@@ -38,7 +39,7 @@ type QuranGroup struct {
 type BookGroup struct {
 	BookID     string           `json:"book_id"`
 	BookTitle  string           `json:"book_title"`
-	CoverImage string          `json:"cover_image,omitempty"`
+	CoverImage string           `json:"cover_image,omitempty"`
 	ItemCount  int              `json:"item_count"`
 	Items      []BookItemDetail `json:"items"`
 }
@@ -76,7 +77,7 @@ func NewMyItemService(
 	}
 }
 
-func (s *MyItemService) GetMyQuranItems(userID uuid.UUID) (*MyItemsQuranResponse, error) {
+func (s *MyItemService) GetMyQuranItems(userID uuid.UUID, classID string) (*MyItemsQuranResponse, error) {
 	// Fetch all quran items
 	items, err := s.itemRepo.FindByOwnerAndSourceType(userID, "quran")
 	if err != nil {
@@ -99,24 +100,32 @@ func (s *MyItemService) GetMyQuranItems(userID uuid.UUID) (*MyItemsQuranResponse
 		juzInfoMap = make(map[string]repositories.JuzInfo)
 	}
 
-	// Group items by juz
-	juzGroupMap := make(map[int]*QuranGroup)
-	var juzOrder []int
+	// Group items by juz ID because the same juz index can exist in personal and class scopes.
+	juzGroupMap := make(map[string]*QuranGroup)
+	var juzOrder []string
 
 	for _, item := range items {
 		info := juzInfoMap[item.ID.String()]
-		juzIdx := info.JuzIndex
-
-		if _, exists := juzGroupMap[juzIdx]; !exists {
-			juzGroupMap[juzIdx] = &QuranGroup{
-				JuzIndex: juzIdx,
-				JuzID:    info.JuzID,
-				Items:    []QuranItemDetail{},
+		if classID != "" {
+			if info.ClassID == nil || *info.ClassID != classID {
+				continue
 			}
-			juzOrder = append(juzOrder, juzIdx)
+		}
+		if info.JuzID == "" {
+			continue
 		}
 
-		juzGroupMap[juzIdx].Items = append(juzGroupMap[juzIdx].Items, QuranItemDetail{
+		if _, exists := juzGroupMap[info.JuzID]; !exists {
+			juzGroupMap[info.JuzID] = &QuranGroup{
+				JuzIndex: info.JuzIndex,
+				JuzID:    info.JuzID,
+				ClassID:  info.ClassID,
+				Items:    []QuranItemDetail{},
+			}
+			juzOrder = append(juzOrder, info.JuzID)
+		}
+
+		juzGroupMap[info.JuzID].Items = append(juzGroupMap[info.JuzID].Items, QuranItemDetail{
 			MyItemDetail: MyItemDetail{
 				ItemID:      item.ID,
 				ContentRef:  item.ContentRef,

@@ -23,6 +23,168 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/book-updates/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all pending book update requests",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book Admin"
+                ],
+                "summary": "Get pending book updates (Admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entities.BookUpdateRequest"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/book-updates/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Approve a pending book update request",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book Admin"
+                ],
+                "summary": "Approve book update (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Update Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/book-updates/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reject a pending book update request",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book Admin"
+                ],
+                "summary": "Reject book update (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Update Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reject request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RejectBookUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/books/pending": {
             "get": {
                 "security": [
@@ -71,6 +233,108 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/books/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get any user's book detail with modules and items (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book Admin"
+                ],
+                "summary": "Get book detail (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entities.Book"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a published book and all its modules/items",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book Admin"
+                ],
+                "summary": "Delete published book (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.ErrorResponse"
                         }
@@ -1024,6 +1288,98 @@ const docTemplate = `{
                 }
             }
         },
+        "/books/my-collection": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all published books added to user's collection (read-only books from other users)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "My Book Collection"
+                ],
+                "summary": "Get my book collection",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/services.BookCollectionItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/my-collection/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove a book from user's collection (deletes all memorization items from that book)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "My Book Collection"
+                ],
+                "summary": "Remove book from my collection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/books/published": {
             "get": {
                 "description": "Get all published/approved books",
@@ -1061,6 +1417,244 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/published/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get book detail for a book that must be in published status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book"
+                ],
+                "summary": "Get published book detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entities.Book"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/published/{id}/add-to-my-books": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create Item rows for each BookItem in the published book (preparing user memorization items)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book"
+                ],
+                "summary": "Add a published book into my book items",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/services.AddPublishedBookToMyBookResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/published/{id}/copy-to-draft": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Copy published book structure (modules \u0026 items) into a new draft owned by the user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book"
+                ],
+                "summary": "Copy published book to my draft",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Published Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Copy request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CopyPublishedBookToDraftRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entities.Book"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/upload-cover": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload a cover image (jpg/jpeg/png). Auto-resized if \u003e 3MB. Returns the file path to use as cover_image.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book"
+                ],
+                "summary": "Upload book cover image",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Cover image file (jpg, jpeg, png)",
+                        "name": "cover",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/utils.ErrorResponse"
                         }
@@ -1203,7 +1797,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get book detail with modules and items",
+                "description": "Get book detail with modules and items. Class-assigned books are accessible to students who joined a class containing the book.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1235,7 +1829,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entities.Book"
+                                            "$ref": "#/definitions/services.BookDetailWithStability"
                                         }
                                     }
                                 }
@@ -1361,7 +1955,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "User starts memorizing a specific item from a book (published or owned)",
+                "description": "User starts memorizing a specific item from a book. For class-assigned books, only students who joined a class containing the book can start its items.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1423,7 +2017,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Submit book for admin approval",
+                "description": "Submit book for admin approval. Set is_editable=true to allow users who import/copy this book to edit items and modules; false to make it read-only for them.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1441,6 +2035,15 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Request publish options",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RequestPublishRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -1459,14 +2062,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/cards/{id}/review": {
+        "/books/{id}/request-update": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Submit a review rating for a flashcard (FSRS algorithm)",
+                "description": "Request an update for a published book (requires admin approval)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1474,24 +2077,24 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Card"
+                    "Book"
                 ],
-                "summary": "Review a card",
+                "summary": "Request book update (Owner)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Card ID",
+                        "description": "Book ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Review rating (1=Again, 2=Hard, 3=Good, 4=Easy)",
+                        "description": "Update request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.ReviewCardRequest"
+                            "$ref": "#/definitions/handlers.RequestBookUpdateRequest"
                         }
                     }
                 ],
@@ -1499,19 +2102,126 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.ReviewCardResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entities.BookUpdateRequest"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{id}/tree": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get hierarchical modules (with items) for a book. Class-assigned books are accessible to students who joined a class containing the book.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book"
+                ],
+                "summary": "Get book module tree",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{id}/update-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all update requests for a book",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Book"
+                ],
+                "summary": "Get book update requests",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Book ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entities.BookUpdateRequest"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1916,7 +2626,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all books in a book-type class",
+                "description": "Get all books in a book-type class. Teacher and students who joined the class can access this endpoint.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2098,7 +2808,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Teacher gets all items pending graduation approval in a class",
+                "description": "Teacher gets all Quran items pending graduation approval in a class. Only items created in juz with this class_id are returned.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2162,7 +2872,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Teacher approves an item for graduation",
+                "description": "Teacher approves an item for graduation. The item must belong to a student in this Quran class and be created in a juz with this class_id.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2218,7 +2928,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Teacher rejects an item for graduation (returns to fsrs_active)",
+                "description": "Teacher rejects an item for graduation (returns to fsrs_active). The item must belong to this Quran class scope.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2381,7 +3091,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get progress of all students in quran-type class",
+                "description": "Get progress of all students for class-scoped items. Quran classes use juz created with class_id; book classes use books assigned to the class.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2476,13 +3186,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -2519,105 +3229,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/daily-tasks/{card_id}/done": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Mark a daily task as completed",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Daily Task"
-                ],
-                "summary": "Mark task as done",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Card ID",
-                        "name": "card_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiber.Error"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/fiber.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/daily-tasks/{card_id}/skip": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Mark a daily task as skipped",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Daily Task"
-                ],
-                "summary": "Mark task as skipped",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Card ID",
-                        "name": "card_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/fiber.Error"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -2663,7 +3281,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -2776,14 +3394,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/items/{item_id}/deactivate": {
-            "post": {
+        "/items/{item_id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Move book item from fsrs_active to inactive status. Only for non-quran items.",
+                "description": "Get detailed information for an item, with book/juz enrichment",
                 "consumes": [
                     "application/json"
                 ],
@@ -2793,7 +3411,62 @@ const docTemplate = `{
                 "tags": [
                     "Item Status"
                 ],
-                "summary": "Deactivate a book item",
+                "summary": "Get item detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handlers.ItemDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/items/{item_id}/activate-fsrs": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Move item from interval to fsrs_active phase (user decision). For class book items, only students who joined a class containing the book can activate FSRS.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item Status"
+                ],
+                "summary": "Activate item to FSRS phase",
                 "parameters": [
                     {
                         "type": "string",
@@ -2831,6 +3504,180 @@ const docTemplate = `{
                 }
             }
         },
+        "/items/{item_id}/deactivate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Move book item from fsrs_active to inactive status. Only for non-quran items. Accepts item_id from items table or book_items table.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item Status"
+                ],
+                "summary": "Deactivate a book item",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Item ID (from items or book_items table)",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entities.Item"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/items/{item_id}/interval-days": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Change interval_days and set next interval review to now + interval_days (00:00)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item Status"
+                ],
+                "summary": "Update interval days for interval phase",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New interval days",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIntervalDaysRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entities.Item"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/items/{item_id}/interval-stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get average rating and performance label for an item's interval reviews",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item Status"
+                ],
+                "summary": "Get interval review statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handlers.IntervalStatsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/items/{item_id}/reactivate": {
             "post": {
                 "security": [
@@ -2838,7 +3685,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Move book item from inactive back to fsrs_active status. Only for non-quran items.",
+                "description": "Move book item from inactive back to fsrs_active status. Only for non-quran items. Accepts item_id from items table or book_items table.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2852,7 +3699,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Item ID",
+                        "description": "Item ID (from items or book_items table)",
                         "name": "item_id",
                         "in": "path",
                         "required": true
@@ -2893,7 +3740,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Submit a review rating for a hafalan item",
+                "description": "Submit a review rating for a hafalan item. Class book items can only be reviewed by students who joined a class containing the book.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2950,6 +3797,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/items/{item_id}/review-interval": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submit a review rating for an item during interval phase (1=bad, 2=good, 3=perfect)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item Status"
+                ],
+                "summary": "Review an item in interval phase",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Review rating (1=bad, 2=good, 3=perfect)",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReviewIntervalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handlers.ReviewIntervalResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/items/{item_id}/start-interval": {
             "post": {
                 "security": [
@@ -2957,7 +3868,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Move item from menghafal to interval phase",
+                "description": "Move item from menghafal to interval phase with recurring review",
                 "consumes": [
                     "application/json"
                 ],
@@ -3014,6 +3925,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/juz": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all juz entries with counts per status. Send class_id to return only juz created inside that Quran class.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Juz"
+                ],
+                "summary": "Get my juz list with item status counts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by class-scoped Quran juz",
+                        "name": "class_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/juz/{index}": {
             "post": {
                 "security": [
@@ -3021,7 +3977,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new juz entry for Quran memorization",
+                "description": "Create a new juz entry for Quran memorization. Send class_id to create the juz inside a joined Quran class scope.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3039,6 +3995,12 @@ const docTemplate = `{
                         "name": "index",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Class ID for class-scoped Quran juz",
+                        "name": "class_id",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3062,6 +4024,190 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/juz/{index}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengaktifkan juz tertentu agar masuk antrian review graduate",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Juz"
+                ],
+                "summary": "Aktifkan juz",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Juz index (1-30)",
+                        "name": "index",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/juz/{index}/deactivate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Menonaktifkan juz tertentu agar dilewati dalam antrian review graduate",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Juz"
+                ],
+                "summary": "Nonaktifkan juz",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Juz index (1-30)",
+                        "name": "index",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/juz/{index}/done": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Menandai juz sebagai selesai (done)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Juz"
+                ],
+                "summary": "Tandai juz selesai",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Juz index (1-30)",
+                        "name": "index",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/juz/{index}/undone": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Membatalkan status selesai (done) pada juz",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Juz"
+                ],
+                "summary": "Tandai juz belum selesai",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Juz index (1-30)",
+                        "name": "index",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.ErrorResponse"
                         }
@@ -3161,13 +4307,71 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Error"
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/my-items": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all user's memorization items grouped by juz (quran) or book. Send class_id with type=quran to return only Quran items created inside that class.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "My Items"
+                ],
+                "summary": "Get my items",
+                "parameters": [
+                    {
+                        "enum": [
+                            "quran",
+                            "book"
+                        ],
+                        "type": "string",
+                        "description": "Filter by type: quran or book",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter Quran items by class-scoped juz",
+                        "name": "class_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -3281,6 +4485,10 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_editable": {
+                    "description": "IsEditable controls whether users who import/copy this published book\ncan add, edit, or delete items and modules on their own copy.\ntrue  = importers can freely edit their copy\nfalse = importers cannot modify items/modules (read-only for them)",
+                    "type": "boolean"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -3314,6 +4522,10 @@ const docTemplate = `{
         "entities.BookItem": {
             "type": "object",
             "properties": {
+                "answer": {
+                    "description": "jawaban",
+                    "type": "string"
+                },
                 "book_id": {
                     "type": "string"
                 },
@@ -3323,6 +4535,10 @@ const docTemplate = `{
                 },
                 "created_at": {
                     "type": "string"
+                },
+                "estimated_review_seconds": {
+                    "description": "Estimasi waktu review (detik) opsional untuk item buku.",
+                    "type": "integer"
                 },
                 "id": {
                     "type": "string"
@@ -3376,6 +4592,61 @@ const docTemplate = `{
                 }
             }
         },
+        "entities.BookUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "approved_at": {
+                    "type": "string"
+                },
+                "approved_by": {
+                    "type": "string"
+                },
+                "book": {
+                    "description": "Relations",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entities.Book"
+                        }
+                    ]
+                },
+                "book_id": {
+                    "type": "string"
+                },
+                "cover_image": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "owner": {
+                    "$ref": "#/definitions/entities.User"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "reject_reason": {
+                    "type": "string"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "entities.Class": {
             "type": "object",
             "properties": {
@@ -3386,6 +4657,9 @@ const docTemplate = `{
                     }
                 },
                 "class_code": {
+                    "type": "string"
+                },
+                "cover_image": {
                     "type": "string"
                 },
                 "created_at": {
@@ -3412,6 +4686,12 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "owner_name": {
+                    "type": "string"
+                },
+                "student_count": {
+                    "type": "integer"
                 },
                 "type": {
                     "description": "quran | book",
@@ -3487,6 +4767,14 @@ const docTemplate = `{
                 "difficulty": {
                     "type": "number"
                 },
+                "estimatedReviewSeconds": {
+                    "description": "Estimated time per review (in seconds) for this item, optional",
+                    "type": "integer"
+                },
+                "fsrsstartAt": {
+                    "description": "FSRS start time: when item entered fsrs_active phase (day 1)",
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -3495,7 +4783,11 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "intervalEndAt": {
-                    "description": "Deadline for interval",
+                    "description": "Legacy: deadline for interval (kept for compatibility)",
+                    "type": "string"
+                },
+                "intervalNextReviewAt": {
+                    "description": "Next recurring interval review date",
                     "type": "string"
                 },
                 "intervalStartAt": {
@@ -3532,7 +4824,13 @@ const docTemplate = `{
         "entities.Juz": {
             "type": "object",
             "properties": {
-                "createdAt": {
+                "class_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "done_at": {
                     "type": "string"
                 },
                 "id": {
@@ -3542,7 +4840,16 @@ const docTemplate = `{
                     "description": "1 - 30",
                     "type": "integer"
                 },
-                "userID": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_done": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }
@@ -3614,23 +4921,24 @@ const docTemplate = `{
                 }
             }
         },
-        "fiber.Error": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.AddBookItemRequest": {
             "type": "object",
             "properties": {
+                "answer": {
+                    "type": "string",
+                    "example": "Jawaban dari pertanyaan..."
+                },
                 "content": {
                     "type": "string",
                     "example": "Penjelasan hukum nun mati..."
+                },
+                "estimate_unit": {
+                    "type": "string",
+                    "example": "minutes"
+                },
+                "estimate_value": {
+                    "type": "integer",
+                    "example": 2
                 },
                 "order": {
                     "type": "integer",
@@ -3658,6 +4966,10 @@ const docTemplate = `{
         "handlers.AddModuleItemRequest": {
             "type": "object",
             "properties": {
+                "answer": {
+                    "type": "string",
+                    "example": "Jawaban..."
+                },
                 "book_id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
@@ -3665,6 +4977,14 @@ const docTemplate = `{
                 "content": {
                     "type": "string",
                     "example": "Konten item..."
+                },
+                "estimate_unit": {
+                    "type": "string",
+                    "example": "seconds"
+                },
+                "estimate_value": {
+                    "type": "integer",
+                    "example": 90
                 },
                 "order": {
                     "type": "integer",
@@ -3697,6 +5017,23 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.CopyPublishedBookToDraftRequest": {
+            "type": "object",
+            "properties": {
+                "cover_image": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Panduan belajar tajwid (versi draft)"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Belajar Tajwid (Copy)"
+                }
+            }
+        },
         "handlers.CreateBookRequest": {
             "type": "object",
             "properties": {
@@ -3717,6 +5054,10 @@ const docTemplate = `{
         "handlers.CreateClassRequest": {
             "type": "object",
             "properties": {
+                "cover_image": {
+                    "type": "string",
+                    "example": "https://example.com/class-cover.jpg"
+                },
                 "description": {
                     "type": "string",
                     "example": "Belajar tajwid dari dasar"
@@ -3739,9 +5080,19 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "content_ref": {
-                    "description": "surah:78:1-5 | page:582",
+                    "description": "surah:78:1-5 | page:582 or page:585-589",
                     "type": "string",
                     "example": "surah:78:1-5"
+                },
+                "estimate_unit": {
+                    "description": "seconds | minutes",
+                    "type": "string",
+                    "example": "seconds"
+                },
+                "estimate_value": {
+                    "description": "nilai estimasi",
+                    "type": "integer",
+                    "example": 45
                 },
                 "mode": {
                     "description": "surah | page",
@@ -3753,13 +5104,25 @@ const docTemplate = `{
         "handlers.DailyTaskResponse": {
             "type": "object",
             "properties": {
-                "card_id": {
+                "book_title": {
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                    "example": "Belajar Tajwid"
+                },
+                "content_ref": {
+                    "type": "string",
+                    "example": "surah:78:1-5"
+                },
+                "estimated_review_seconds": {
+                    "type": "integer",
+                    "example": 120
                 },
                 "item_id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "juz_index": {
+                    "type": "integer",
+                    "example": 30
                 },
                 "source": {
                     "type": "string",
@@ -3768,6 +5131,10 @@ const docTemplate = `{
                 "state": {
                     "type": "string",
                     "example": "pending"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "fsrs_active"
                 },
                 "task_date": {
                     "description": "YYYY-MM-DD",
@@ -3796,6 +5163,77 @@ const docTemplate = `{
                 "reason": {
                     "type": "string",
                     "example": "Student has mastered this item"
+                }
+            }
+        },
+        "handlers.IntervalStatsResponse": {
+            "type": "object",
+            "properties": {
+                "average_rating": {
+                    "type": "number"
+                },
+                "item_id": {
+                    "type": "string"
+                },
+                "performance": {
+                    "description": "bad, good, perfect, no_reviews",
+                    "type": "string"
+                },
+                "total_reviews": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ItemDetailResponse": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string"
+                },
+                "book_item_title": {
+                    "type": "string"
+                },
+                "book_title": {
+                    "type": "string"
+                },
+                "content_ref": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "number"
+                },
+                "estimated_review_seconds": {
+                    "type": "integer"
+                },
+                "interval_days": {
+                    "type": "integer"
+                },
+                "interval_next_review_at": {
+                    "type": "string"
+                },
+                "item_id": {
+                    "type": "string"
+                },
+                "juz_index": {
+                    "type": "integer"
+                },
+                "next_review_at": {
+                    "type": "string"
+                },
+                "question": {
+                    "type": "string"
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "source_type": {
+                    "type": "string"
+                },
+                "stability": {
+                    "type": "number"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -3908,44 +5346,79 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.ReviewCardRequest": {
-            "description": "Review card request with rating",
+        "handlers.RejectBookUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "example": "Content needs revision"
+                }
+            }
+        },
+        "handlers.RequestBookUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "cover_image": {
+                    "type": "string",
+                    "example": "https://example.com/cover2.jpg"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Updated description"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Belajar Tajwid Lengkap v2"
+                }
+            }
+        },
+        "handlers.RequestPublishRequest": {
+            "type": "object",
+            "properties": {
+                "is_editable": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "handlers.ReviewIntervalRequest": {
             "type": "object",
             "properties": {
                 "rating": {
-                    "description": "1=Again, 2=Hard, 3=Good, 4=Easy",
+                    "description": "1=bad, 2=good, 3=perfect",
                     "type": "integer",
-                    "maximum": 4,
+                    "maximum": 3,
                     "minimum": 1,
                     "example": 3
                 }
             }
         },
-        "handlers.ReviewCardResponse": {
-            "description": "Response after reviewing a card",
+        "handlers.ReviewIntervalResponse": {
             "type": "object",
             "properties": {
-                "card_id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
-                },
-                "difficulty": {
-                    "type": "number",
-                    "example": 3.2
-                },
-                "last_review_at": {
+                "content_ref": {
                     "type": "string"
                 },
-                "next_interval_days": {
-                    "type": "integer",
-                    "example": 7
+                "interval_days": {
+                    "type": "integer"
                 },
-                "next_review_at": {
+                "interval_next_review_at": {
                     "type": "string"
                 },
-                "stability": {
-                    "type": "number",
-                    "example": 5.5
+                "item_id": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "rating_label": {
+                    "type": "string"
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -3964,6 +5437,10 @@ const docTemplate = `{
         "handlers.ReviewItemResponse": {
             "type": "object",
             "properties": {
+                "content_ref": {
+                    "type": "string",
+                    "example": "surah:78:1-5"
+                },
                 "difficulty": {
                     "type": "number",
                     "example": 3.2
@@ -3975,6 +5452,10 @@ const docTemplate = `{
                 "item_id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "juz_index": {
+                    "type": "integer",
+                    "example": 30
                 },
                 "next_interval_days": {
                     "type": "integer",
@@ -4018,6 +5499,10 @@ const docTemplate = `{
         "handlers.UpdateBookItemRequest": {
             "type": "object",
             "properties": {
+                "answer": {
+                    "type": "string",
+                    "example": "Updated answer..."
+                },
                 "content": {
                     "type": "string",
                     "example": "Updated content..."
@@ -4066,6 +5551,15 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.UpdateIntervalDaysRequest": {
+            "type": "object",
+            "properties": {
+                "interval_days": {
+                    "type": "integer",
+                    "example": 7
+                }
+            }
+        },
         "handlers.UpdateModuleRequest": {
             "type": "object",
             "properties": {
@@ -4097,8 +5591,145 @@ const docTemplate = `{
                 }
             }
         },
+        "services.AddPublishedBookToMyBookResult": {
+            "type": "object",
+            "properties": {
+                "added_content_refs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "added_count": {
+                    "type": "integer"
+                },
+                "book_id": {
+                    "type": "string"
+                },
+                "skipped_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.BookCollectionItem": {
+            "type": "object",
+            "properties": {
+                "added_at": {
+                    "type": "string"
+                },
+                "book_id": {
+                    "type": "string"
+                },
+                "cover_image": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "item_count": {
+                    "type": "integer"
+                },
+                "owner_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.BookDetailWithStability": {
+            "type": "object",
+            "properties": {
+                "cover_image": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_editable": {
+                    "description": "IsEditable controls whether users who import/copy this published book\ncan add, edit, or delete items and modules on their own copy.\ntrue  = importers can freely edit their copy\nfalse = importers cannot modify items/modules (read-only for them)",
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.BookItemWithStability"
+                    }
+                },
+                "modules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ModuleWithStability"
+                    }
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.BookItemWithStability": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "description": "jawaban",
+                    "type": "string"
+                },
+                "book_id": {
+                    "type": "string"
+                },
+                "content": {
+                    "description": "materi konten",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "estimated_review_seconds": {
+                    "description": "Estimasi waktu review (detik) opsional untuk item buku.",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "module_id": {
+                    "description": "null jika langsung di book",
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "stability": {
+                    "description": "\"item belum masuk ujian\" or days until next review",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "services.ItemDetail": {
-            "description": "Detail of a single hafalan item including its current phase/status",
+            "description": "Detail of a single class-scoped item including its current phase/status",
             "type": "object",
             "properties": {
                 "content_ref": {
@@ -4163,6 +5794,45 @@ const docTemplate = `{
                     "description": "UUID of the member",
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "services.ModuleWithStability": {
+            "type": "object",
+            "properties": {
+                "book_id": {
+                    "type": "string"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ModuleWithStability"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.BookItemWithStability"
+                    }
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "parent_id": {
+                    "description": "untuk nested module (opsional)",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -4232,7 +5902,7 @@ const docTemplate = `{
             }
         },
         "services.StudentProgress": {
-            "description": "Progress data for a student in a Quran-type class, showing hafalan statistics and item details",
+            "description": "Progress data for a student in a class, showing class-scoped item statistics and item details",
             "type": "object",
             "properties": {
                 "email": {
@@ -4254,6 +5924,11 @@ const docTemplate = `{
                     "description": "Number of items in 'graduate' status (mastered/completed memorization)",
                     "type": "integer",
                     "example": 5
+                },
+                "inactive": {
+                    "description": "Number of book items in 'inactive' status",
+                    "type": "integer",
+                    "example": 1
                 },
                 "interval": {
                     "description": "Number of items in 'interval' status (waiting for interval period to complete)",
@@ -4281,6 +5956,11 @@ const docTemplate = `{
                     "description": "Overall progress percentage (graduate / total_items * 100)",
                     "type": "number",
                     "example": 16.67
+                },
+                "start": {
+                    "description": "Number of book items in 'start' status",
+                    "type": "integer",
+                    "example": 3
                 },
                 "total_items": {
                     "description": "Total number of hafalan items the student has",

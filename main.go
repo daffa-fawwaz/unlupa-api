@@ -118,7 +118,7 @@ func main() {
 		log.Fatalf("Failed to initialize QuranValidator: %v", err)
 	}
 	itemRepo := repositories.NewItemRepository(config.DB)
-	hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, quranValidator)
+	hafalanSvc := services.NewHafalanService(juzRepo, itemRepo, juzItemRepo, classRepo, classMemberRepo, quranValidator)
 	juzHandler := handlers.NewJuzHandler(hafalanSvc, juzRepo, juzItemRepo, appCache)
 	juzItemHandler := handlers.NewJuzItemHandler(hafalanSvc, appCache, itemRepo, juzItemRepo)
 
@@ -126,21 +126,21 @@ func main() {
 	bookModuleRepo := repositories.NewBookModuleRepository(config.DB)
 	bookItemRepo := repositories.NewBookItemRepository(config.DB)
 	bookUpdateRequestRepo := repositories.NewBookUpdateRequestRepository(config.DB)
-	bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, itemRepo, userRepo, bookUpdateRequestRepo)
+	classBookRepo := repositories.NewClassBookRepository(config.DB)
+	bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, classBookRepo, itemRepo, userRepo, bookUpdateRequestRepo)
 	bookHandler := handlers.NewBookHandler(bookSvc, appCache)
 
 	// ================= ITEM STATUS =================
 	intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)
-	itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo)
-	itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc, juzItemRepo, bookRepo, bookItemRepo, itemRepo)
+	itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo, classBookRepo)
+	itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc, juzItemRepo, bookRepo, bookItemRepo, itemRepo, appCache)
 
 	// ================= CLASS =================
-	classBookRepo := repositories.NewClassBookRepository(config.DB)
-	classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo)
+	classSvc := services.NewClassService(classRepo, classMemberRepo, classBookRepo, bookRepo, userRepo, itemRepo, juzRepo, juzItemRepo)
 	classHandler := handlers.NewClassHandler(classSvc)
 
 	// ================= ITEM REVIEW =================
-	itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo)
+	itemReviewSvc := services.NewItemReviewService(itemRepo, fsrsWeightsRepo, dailyTaskActionRepo, classMemberRepo, classRepo, classBookRepo)
 	itemReviewHandler := handlers.NewItemReviewHandler(itemReviewSvc, juzItemRepo, appCache)
 
 	// ================= MY ITEMS =================

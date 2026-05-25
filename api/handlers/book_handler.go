@@ -131,7 +131,7 @@ func (h *BookHandler) GetPublishedBooks(c *fiber.Ctx) error {
 
 // GetBookDetail godoc
 // @Summary Get book detail
-// @Description Get book detail with modules and items
+// @Description Get book detail with modules and items. Class-assigned books are accessible to students who joined a class containing the book.
 // @Tags Book
 // @Accept json
 // @Produce json
@@ -634,7 +634,7 @@ func (h *BookHandler) AddModule(c *fiber.Ctx) error {
 
 // GetBookTree godoc
 // @Summary Get book module tree
-// @Description Get hierarchical modules (with items) for a book
+// @Description Get hierarchical modules (with items) for a book. Class-assigned books are accessible to students who joined a class containing the book.
 // @Tags Book
 // @Accept json
 // @Produce json
@@ -951,7 +951,7 @@ type UpdateBookItemRequest struct {
 
 // StartMemorization godoc
 // @Summary Start memorizing a book item
-// @Description User starts memorizing a specific item from a book (published or owned)
+// @Description User starts memorizing a specific item from a book. For class-assigned books, only students who joined a class containing the book can start its items.
 // @Tags Book
 // @Accept json
 // @Produce json

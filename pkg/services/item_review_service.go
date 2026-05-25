@@ -30,6 +30,7 @@ type ItemReviewService struct {
 	dailyTaskActionRepo repositories.DailyTaskActionRepository
 	classMemberRepo     repositories.ClassMemberRepository
 	classRepo           repositories.ClassRepository
+	classBookRepo       repositories.ClassBookRepository
 }
 
 func NewItemReviewService(
@@ -38,6 +39,7 @@ func NewItemReviewService(
 	dailyTaskActionRepo repositories.DailyTaskActionRepository,
 	classMemberRepo repositories.ClassMemberRepository,
 	classRepo repositories.ClassRepository,
+	classBookRepo repositories.ClassBookRepository,
 ) *ItemReviewService {
 	return &ItemReviewService{
 		itemRepo:            itemRepo,
@@ -45,6 +47,7 @@ func NewItemReviewService(
 		dailyTaskActionRepo: dailyTaskActionRepo,
 		classMemberRepo:     classMemberRepo,
 		classRepo:           classRepo,
+		classBookRepo:       classBookRepo,
 	}
 }
 
@@ -68,6 +71,28 @@ func (s *ItemReviewService) isUserInQuranClass(userID uuid.UUID) bool {
 	return false
 }
 
+func (s *ItemReviewService) canAccessBookItem(item *entities.Item, userID uuid.UUID) bool {
+	if item.SourceType != "book" {
+		return true
+	}
+
+	bookID, ok := bookIDFromItemContentRef(item.ContentRef)
+	if !ok || s.classBookRepo == nil {
+		return false
+	}
+
+	isClassBook, err := s.classBookRepo.IsBookAssignedToClass(bookID)
+	if err != nil {
+		return false
+	}
+	if !isClassBook {
+		return true
+	}
+
+	allowed, err := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
+	return err == nil && allowed
+}
+
 func (s *ItemReviewService) ReviewItem(
 	userID uuid.UUID,
 	itemID uuid.UUID,
@@ -84,6 +109,9 @@ func (s *ItemReviewService) ReviewItem(
 	// 2. Validate ownership
 	if item.OwnerID != userID {
 		return nil, errors.New("unauthorized")
+	}
+	if !s.canAccessBookItem(item, userID) {
+		return nil, errors.New("you don't have access to this book item")
 	}
 
 	// 3. Validate status - must be fsrs_active or graduate (for periodic review)
@@ -160,11 +188,10 @@ func (s *ItemReviewService) ReviewItem(
 	item.NextReviewAt = &nextReview
 
 	// 12. Check for graduation in fsrs_active
-	// Book items: NO auto-graduate, stay in fsrs_active until user deactivates
 	graduated := false
 	pendingGraduate := false
 
-	// Handle book items: START → FSRS_ACTIVE (no auto-graduate)
+	// Handle book items: START → FSRS_ACTIVE
 	if item.SourceType == "book" {
 		// Transition from start/menghafal to fsrs_active on first review
 		if item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal {
@@ -173,9 +200,9 @@ func (s *ItemReviewService) ReviewItem(
 				item.FSRSStartAt = &now
 			}
 		}
-		// Book items stay in fsrs_active forever until user deactivates
-	} else if item.Status == entities.ItemStatusFSRSActive {
-		// Quran items logic (existing)
+	}
+
+	if item.Status == entities.ItemStatusFSRSActive {
 		daysInFSRSActive := 0
 		if item.FSRSStartAt != nil {
 			daysInFSRSActive = int(now.Sub(*item.FSRSStartAt).Hours() / 24)
