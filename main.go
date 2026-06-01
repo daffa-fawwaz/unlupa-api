@@ -16,6 +16,7 @@ import (
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/usecases"
+	"hifzhun-api/pkg/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
@@ -48,7 +49,19 @@ func main() {
 	config.InitRedis()
 	appCache := cache.New(config.RedisClient)
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: utils.MaxImageSize + 1024*1024,
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			if fiberErr, ok := err.(*fiber.Error); ok {
+				if fiberErr.Code == fiber.StatusRequestEntityTooLarge {
+					return utils.Error(c, fiber.StatusBadRequest, "image size must be 3MB or less", "BAD_REQUEST", nil)
+				}
+				return utils.Error(c, fiberErr.Code, fiberErr.Message, "ERROR", nil)
+			}
+
+			return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "INTERNAL_SERVER_ERROR", nil)
+		},
+	})
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173,https://unlupa.id,https://www.unlupa.id,https://api.unlupa.id",
