@@ -22,10 +22,13 @@ func NewClassHandler(classSvc services.ClassService) *ClassHandler {
 // @Summary Create a new class
 // @Description Teacher creates a new class (quran or book type)
 // @Tags Class
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
-// @Param request body CreateClassRequest true "Create class request"
+// @Param name formData string true "Class name"
+// @Param description formData string false "Class description"
+// @Param type formData string true "Class type: quran or book"
+// @Param cover_image formData file false "Cover image file (png, jpg, jpeg, webp; max 3MB)"
 // @Success 201 {object} utils.SuccessResponse{data=entities.Class}
 // @Failure 400 {object} utils.ErrorResponse
 // @Failure 403 {object} utils.ErrorResponse
@@ -33,15 +36,9 @@ func NewClassHandler(classSvc services.ClassService) *ClassHandler {
 func (h *ClassHandler) CreateClass(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 
-	var req struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-		Type        string `json:"type"` // quran | book
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	var req coverImagePayload
+	if err := parseCoverImagePayload(c, &req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "BAD_REQUEST", nil)
 	}
 
 	class, err := h.classSvc.CreateClass(userID, req.Name, req.Description, req.Type, req.CoverImage)

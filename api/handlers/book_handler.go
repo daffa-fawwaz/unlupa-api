@@ -63,14 +63,9 @@ func NewBookHandler(bookSvc services.BookService, c *cache.Cache) *BookHandler {
 func (h *BookHandler) CreateBook(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 
-	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	var req coverImagePayload
+	if err := parseCoverImagePayload(c, &req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "BAD_REQUEST", nil)
 	}
 
 	book, err := h.bookSvc.CreateBook(userID, req.Title, req.Description, req.CoverImage)
@@ -202,14 +197,9 @@ func (h *BookHandler) UpdateBook(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	bookID := c.Params("id")
 
-	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	var req coverImagePayload
+	if err := parseCoverImagePayload(c, &req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "BAD_REQUEST", nil)
 	}
 
 	book, err := h.bookSvc.UpdateBook(bookID, userID, req.Title, req.Description, req.CoverImage)
@@ -323,11 +313,14 @@ func (h *BookHandler) CopyPublishedBookToDraft(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	publishedBookID := c.Params("id")
 
-	var req CopyPublishedBookToDraftRequest
-	if err := c.BodyParser(&req); err != nil {
+	var req coverImagePayload
+	if err := parseCoverImagePayload(c, &req); err != nil {
+		if isMultipartForm(c) {
+			return utils.Error(c, fiber.StatusBadRequest, err.Error(), "BAD_REQUEST", nil)
+		}
 		// Body can be empty; BodyParser fails for empty body in some cases.
 		// Treat empty body as default values (use source book values).
-		req = CopyPublishedBookToDraftRequest{}
+		req = coverImagePayload{}
 	}
 
 	book, err := h.bookSvc.CopyPublishedBookToDraft(userID, publishedBookID, req.Title, req.Description, req.CoverImage)
@@ -524,14 +517,9 @@ func (h *BookHandler) RequestBookUpdate(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	bookID := c.Params("id")
 
-	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	var req coverImagePayload
+	if err := parseCoverImagePayload(c, &req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "BAD_REQUEST", nil)
 	}
 
 	updateReq, err := h.bookSvc.RequestBookUpdate(bookID, userID, req.Title, req.Description, req.CoverImage)
