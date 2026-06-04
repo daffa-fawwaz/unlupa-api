@@ -22,6 +22,9 @@ type User struct {
 	SubscriptionStatus string     `gorm:"size:20;default:inactive" json:"subscription_status"`
 	LastPaymentRef     string     `gorm:"size:100" json:"last_payment_ref"`
 
+	// ===== PREMIUM =====
+	IsPremium bool `gorm:"not null;default:false" json:"is_premium"`
+
 	// ===== PROFILE =====
 	FullName  string `gorm:"size:100" json:"full_name"`
 

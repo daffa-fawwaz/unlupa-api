@@ -26,6 +26,7 @@ type DailyTaskResponse struct {
 	JuzIndex               int       `json:"juz_index" example:"30"`
 	EstimatedReviewSeconds int       `json:"estimated_review_seconds" example:"120"`
 	BookTitle              string    `json:"book_title,omitempty" example:"Belajar Tajwid"`
+	ImageURL               string    `json:"image_url,omitempty" example:"https://example.com/image.jpg"`
 }
 
 type DailyTaskGroup struct {
@@ -34,11 +35,12 @@ type DailyTaskGroup struct {
 }
 
 type DailyTaskHandler struct {
-	service     services.DailyTaskService
-	itemRepo    *repositories.ItemRepository
-	juzItemRepo *repositories.JuzItemRepository
-	bookRepo    repositories.BookRepository
-	cache       *cache.Cache
+	service      services.DailyTaskService
+	itemRepo     *repositories.ItemRepository
+	juzItemRepo  *repositories.JuzItemRepository
+	bookRepo     repositories.BookRepository
+	bookItemRepo repositories.BookItemRepository
+	cache        *cache.Cache
 }
 
 func NewDailyTaskHandler(
@@ -46,14 +48,16 @@ func NewDailyTaskHandler(
 	itemRepo *repositories.ItemRepository,
 	juzItemRepo *repositories.JuzItemRepository,
 	bookRepo repositories.BookRepository,
+	bookItemRepo repositories.BookItemRepository,
 	c *cache.Cache,
 ) *DailyTaskHandler {
 	return &DailyTaskHandler{
-		service:     service,
-		itemRepo:    itemRepo,
-		juzItemRepo: juzItemRepo,
-		bookRepo:    bookRepo,
-		cache:       c,
+		service:      service,
+		itemRepo:     itemRepo,
+		juzItemRepo:  juzItemRepo,
+		bookRepo:     bookRepo,
+		bookItemRepo: bookItemRepo,
+		cache:        c,
 	}
 }
 
@@ -228,8 +232,10 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		}
 	}
 
-	// Map item -> book title
+	// Map item -> book title & collect book_item_ids for image_url lookup
 	bookTitleByItem := make(map[uuid.UUID]string)
+	// item.ID -> book_item_id (the 4th segment of "book:{bid}:item:{book_item_id}")
+	bookItemIDByItem := make(map[uuid.UUID]string)
 	for id, ref := range itemMap {
 		if len(ref) > 5 && ref[:5] == "book:" {
 			parts := make([]string, 0, 4)
@@ -241,10 +247,44 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 				}
 			}
 			parts = append(parts, ref[start:])
-			if len(parts) >= 2 && parts[0] == "book" {
+			if len(parts) >= 4 && parts[0] == "book" && parts[2] == "item" {
+				bid := parts[1]
+				bookItemID := parts[3]
+				if title, ok := bookTitleByID[bid]; ok {
+					bookTitleByItem[id] = title
+				}
+				if bookItemID != "" {
+					bookItemIDByItem[id] = bookItemID
+				}
+			} else if len(parts) >= 2 && parts[0] == "book" {
 				bid := parts[1]
 				if title, ok := bookTitleByID[bid]; ok {
 					bookTitleByItem[id] = title
+				}
+			}
+		}
+	}
+
+	// Batch fetch book items to get image_url
+	imageURLByItem := make(map[uuid.UUID]string)
+	if h.bookItemRepo != nil && len(bookItemIDByItem) > 0 {
+		bookItemIDs := make([]string, 0, len(bookItemIDByItem))
+		for _, bid := range bookItemIDByItem {
+			bookItemIDs = append(bookItemIDs, bid)
+		}
+		bookItems, err := h.bookItemRepo.FindByIDs(bookItemIDs)
+		if err == nil {
+			// Build book_item_id -> image_url map
+			bookItemImageMap := make(map[string]string, len(bookItems))
+			for _, bi := range bookItems {
+				if bi.ImageURL != "" {
+					bookItemImageMap[bi.ID.String()] = bi.ImageURL
+				}
+			}
+			// Map back to item.ID
+			for itemID, bookItemID := range bookItemIDByItem {
+				if imgURL, ok := bookItemImageMap[bookItemID]; ok {
+					imageURLByItem[itemID] = imgURL
 				}
 			}
 		}
@@ -271,6 +311,7 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			JuzIndex:               juzMap[t.ItemID.String()],
 			EstimatedReviewSeconds: itemEstimateMap[t.ItemID],
 			BookTitle:              bookTitleByItem[t.ItemID],
+			ImageURL:               imageURLByItem[t.ItemID],
 		})
 	}
 

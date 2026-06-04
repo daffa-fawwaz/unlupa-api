@@ -152,11 +152,12 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		fiber.StatusOK,
 		"login success",
 		fiber.Map{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.FullName,
-			"role":  user.Role,
-			"token": token,
+			"id":         user.ID,
+			"email":      user.Email,
+			"name":       user.FullName,
+			"role":       user.Role,
+			"is_premium": user.IsPremium,
+			"token":      token,
 		},
 		nil,
 	)
@@ -187,9 +188,10 @@ type LoginRequest struct {
 
 // LoginResponse represents login response data
 type LoginResponse struct {
-	ID    string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Email string `json:"email" example:"user@example.com"`
-	Name  string `json:"name" example:"John Doe"`
-	Role  string `json:"role" example:"student"`
-	Token string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Email     string `json:"email" example:"user@example.com"`
+	Name      string `json:"name" example:"John Doe"`
+	Role      string `json:"role" example:"student"`
+	IsPremium bool   `json:"is_premium" example:"false"`
+	Token     string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }

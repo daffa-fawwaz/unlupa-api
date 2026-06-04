@@ -9,6 +9,7 @@ import (
 type BookItemRepository interface {
 	Create(item *entities.BookItem) error
 	FindByID(id string) (*entities.BookItem, error)
+	FindByIDs(ids []string) ([]entities.BookItem, error)
 	FindByBookID(bookID string) ([]entities.BookItem, error)
 	FindByModuleID(moduleID string) ([]entities.BookItem, error)
 	Update(item *entities.BookItem) error
@@ -33,6 +34,15 @@ func (r *bookItemRepository) FindByID(id string) (*entities.BookItem, error) {
 	var item entities.BookItem
 	err := r.db.Where("id = ?", id).First(&item).Error
 	return &item, err
+}
+
+func (r *bookItemRepository) FindByIDs(ids []string) ([]entities.BookItem, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var items []entities.BookItem
+	err := r.db.Where("id IN ?", ids).Find(&items).Error
+	return items, err
 }
 
 func (r *bookItemRepository) FindByBookID(bookID string) ([]entities.BookItem, error) {
