@@ -17,6 +17,9 @@ type BookItem struct {
 	Answer  string `gorm:"type:text" json:"answer"`  // jawaban
 	Order   int    `gorm:"not null;default:0" json:"order"`
 
+	// Gambar item (hanya untuk user premium)
+	ImageURL string `gorm:"size:500" json:"image_url,omitempty"`
+
 	// Estimasi waktu review (detik) opsional untuk item buku.
 	EstimatedReviewSeconds int `gorm:"default:0" json:"estimated_review_seconds"`
 

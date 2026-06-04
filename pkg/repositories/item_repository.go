@@ -32,6 +32,12 @@ func (r *ItemRepository) DeleteByID(id uuid.UUID) error {
 	return r.db.Where("id = ?", id).Delete(&entities.Item{}).Error
 }
 
+func (r *ItemRepository) DeleteBookItemsByBookID(bookID string) error {
+	return r.db.
+		Where("source_type = ? AND content_ref LIKE ?", "book", "book:"+bookID+":%").
+		Delete(&entities.Item{}).Error
+}
+
 func (r *ItemRepository) FindByOwnerAndStatus(ownerID uuid.UUID, status string) ([]entities.Item, error) {
 	var items []entities.Item
 	err := r.db.Where("owner_id = ? AND status = ?", ownerID, status).Find(&items).Error
@@ -64,24 +70,24 @@ func (r *ItemRepository) FindIntervalReviewDue(ownerID uuid.UUID, now time.Time)
 // Also includes book items with status=start (for first review)
 func (r *ItemRepository) FindFSRSDueItems(ownerID uuid.UUID, now time.Time) ([]entities.Item, error) {
 	var items []entities.Item
-	
+
 	// Get FSRS active items that are due (next_review_at <= now)
 	// Normalize now to end of day (23:59:59) to include all items due today
 	endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
-	
+
 	err := r.db.
-		Where("owner_id = ? AND status = ? AND next_review_at <= ?", 
+		Where("owner_id = ? AND status = ? AND next_review_at <= ?",
 			ownerID, entities.ItemStatusFSRSActive, endOfDay).
 		Find(&items).Error
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Also get book items with status=start (they're always due for first review)
 	// These items don't have next_review_at set yet, or next_review_at is in the past
 	var startItems []entities.Item
 	err = r.db.
-		Where("owner_id = ? AND source_type = 'book' AND status = ?", 
+		Where("owner_id = ? AND source_type = 'book' AND status = ?",
 			ownerID, entities.ItemStatusStart).
 		Find(&startItems).Error
 	if err == nil {
@@ -92,7 +98,7 @@ func (r *ItemRepository) FindFSRSDueItems(ownerID uuid.UUID, now time.Time) ([]e
 			}
 		}
 	}
-	
+
 	return items, err
 }
 

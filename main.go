@@ -116,7 +116,7 @@ func main() {
 		classRepo,
 		juzRepo,
 	)
-	dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo, bookRepo, appCache)
+	dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskSvc, itemRepoForDaily, juzItemRepo, bookRepo, repositories.NewBookItemRepository(config.DB), appCache)
 
 	dailyTaskActionRepo := repositories.NewDailyTaskActionRepository(config.DB)
 
@@ -141,7 +141,7 @@ func main() {
 	bookUpdateRequestRepo := repositories.NewBookUpdateRequestRepository(config.DB)
 	classBookRepo := repositories.NewClassBookRepository(config.DB)
 	bookSvc := services.NewBookService(bookRepo, bookModuleRepo, bookItemRepo, classBookRepo, itemRepo, userRepo, bookUpdateRequestRepo)
-	bookHandler := handlers.NewBookHandler(bookSvc, appCache)
+	bookHandler := handlers.NewBookHandler(bookSvc, userRepo, appCache)
 
 	// ================= ITEM STATUS =================
 	intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)

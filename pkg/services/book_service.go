@@ -46,8 +46,8 @@ type BookService interface {
 	DeleteModule(moduleID string, ownerID uuid.UUID) error
 
 	// Item CRUD
-	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error)
-	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error)
+	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error)
+	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
 
 	// Memorization
@@ -766,7 +766,13 @@ func (s *bookService) DeleteBook(bookID string, ownerID uuid.UUID) error {
 		return errors.New("cannot delete published book")
 	}
 
-	// Delete all related items and modules
+	// Delete memorization Item rows created from this book before deleting the
+	// book structure itself.
+	if err := s.itemRepo.DeleteBookItemsByBookID(bookID); err != nil {
+		return err
+	}
+
+	// Delete all related book items and modules
 	if err := s.bookItemRepo.DeleteByBookID(bookID); err != nil {
 		return err
 	}
@@ -843,7 +849,13 @@ func (s *bookService) DeletePublishedBook(bookID string) error {
 		return errors.New("book is not published")
 	}
 
-	// Delete all related items and modules
+	// Delete memorization Item rows created from this book before deleting the
+	// book structure itself.
+	if err := s.itemRepo.DeleteBookItemsByBookID(bookID); err != nil {
+		return err
+	}
+
+	// Delete all related book items and modules
 	if err := s.bookItemRepo.DeleteByBookID(bookID); err != nil {
 		return err
 	}
@@ -1091,7 +1103,7 @@ func (s *bookService) DeleteModule(moduleID string, ownerID uuid.UUID) error {
 
 // ==================== ITEM CRUD ====================
 
-func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error) {
+func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error) {
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
@@ -1148,6 +1160,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		Answer:                 answer,
 		Order:                  order,
 		EstimatedReviewSeconds: estSeconds,
+		ImageURL:               imageURL,
 		CreatedAt:              time.Now().In(config.AppLocation),
 		UpdatedAt:              time.Now().In(config.AppLocation),
 	}
@@ -1159,7 +1172,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 	return item, nil
 }
 
-func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string) (*entities.BookItem, error) {
+func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error) {
 	item, err := s.bookItemRepo.FindByID(itemID)
 	if err != nil {
 		return nil, errors.New("item not found")
@@ -1201,6 +1214,9 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 		default: // "seconds" or anything else
 			item.EstimatedReviewSeconds = estimateVal
 		}
+	}
+	if imageURL != "" {
+		item.ImageURL = imageURL
 	}
 	item.UpdatedAt = time.Now().In(config.AppLocation)
 

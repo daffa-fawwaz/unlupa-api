@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	"hifzhun-api/pkg/cache"
+	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/utils"
 
@@ -39,12 +42,39 @@ func (h *BookHandler) UploadCoverImage(c *fiber.Ctx) error {
 }
 
 type BookHandler struct {
-	bookSvc services.BookService
-	cache   *cache.Cache
+	bookSvc  services.BookService
+	userRepo repositories.UserRepository
+	cache    *cache.Cache
 }
 
-func NewBookHandler(bookSvc services.BookService, c *cache.Cache) *BookHandler {
-	return &BookHandler{bookSvc: bookSvc, cache: c}
+func NewBookHandler(bookSvc services.BookService, userRepo repositories.UserRepository, c *cache.Cache) *BookHandler {
+	return &BookHandler{bookSvc: bookSvc, userRepo: userRepo, cache: c}
+}
+
+// uploadItemImageIfPremium checks whether the user is premium and uploads the
+// "image" form file if present. Returns an error if the user is not premium but
+// tries to upload an image. Returns an empty string when no image is provided.
+func (h *BookHandler) uploadItemImageIfPremium(c *fiber.Ctx, userID uuid.UUID) (string, error) {
+	file, err := c.FormFile("image")
+	if err != nil || file == nil {
+		// No image uploaded — allowed for everyone
+		return "", nil
+	}
+
+	// Image uploaded — check premium status
+	user, err := h.userRepo.FindByID(userID.String())
+	if err != nil {
+		return "", fmt.Errorf("failed to verify user")
+	}
+	if !user.IsPremium {
+		return "", fmt.Errorf("image upload is only available for premium users")
+	}
+
+	imageURL, err := utils.SaveCoverImage(file)
+	if err != nil {
+		return "", err
+	}
+	return imageURL, nil
 }
 
 // ==================== BOOK ENDPOINTS ====================
@@ -715,13 +745,19 @@ func (h *BookHandler) DeleteModule(c *fiber.Ctx) error {
 
 // AddItemToBook godoc
 // @Summary Add item to book
-// @Description Add a new item directly to a book
+// @Description Add a new item directly to a book. Use multipart/form-data. Image upload (field: image) is only allowed for premium users.
 // @Tags Book Item
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
 // @Param book_id path string true "Book ID"
-// @Param request body AddBookItemRequest true "Add item request"
+// @Param title formData string false "Item title"
+// @Param content formData string true "Item content"
+// @Param answer formData string true "Item answer"
+// @Param order formData int false "Item order"
+// @Param estimate_value formData int false "Estimate value"
+// @Param estimate_unit formData string false "Estimate unit (seconds or minutes)"
+// @Param image formData file false "Item image (premium only)"
 // @Success 201 {object} utils.SuccessResponse{data=entities.BookItem}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /books/{book_id}/items [post]
@@ -729,20 +765,31 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	bookID := c.Params("id")
 
-	var req struct {
-		Title         string `json:"title"`
-		Content       string `json:"content"`
-		Answer        string `json:"answer"`
-		Order         int    `json:"order"`
-		EstimateValue int    `json:"estimate_value"`
-		EstimateUnit  string `json:"estimate_unit"` // "seconds" | "minutes"
+	title := c.FormValue("title")
+	content := c.FormValue("content")
+	answer := c.FormValue("answer")
+	order := 0
+	estimateValue := 0
+	estimateUnit := c.FormValue("estimate_unit")
+
+	if v := c.FormValue("order"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			order = n
+		}
+	}
+	if v := c.FormValue("estimate_value"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			estimateValue = n
+		}
 	}
 
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	// Handle image upload (premium only)
+	imageURL, err := h.uploadItemImageIfPremium(c, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(bookID, nil, userID, req.Title, req.Content, req.Answer, req.Order, req.EstimateValue, req.EstimateUnit)
+	item, err := h.bookSvc.AddItem(bookID, nil, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -752,13 +799,20 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 
 // AddItemToModule godoc
 // @Summary Add item to module
-// @Description Add a new item to a book module
+// @Description Add a new item to a book module. Use multipart/form-data. Image upload (field: image) is only allowed for premium users.
 // @Tags Book Item
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
 // @Param module_id path string true "Module ID"
-// @Param request body AddModuleItemRequest true "Add item request"
+// @Param book_id formData string true "Book ID"
+// @Param title formData string false "Item title"
+// @Param content formData string true "Item content"
+// @Param answer formData string true "Item answer"
+// @Param order formData int false "Item order"
+// @Param estimate_value formData int false "Estimate value"
+// @Param estimate_unit formData string false "Estimate unit (seconds or minutes)"
+// @Param image formData file false "Item image (premium only)"
 // @Success 201 {object} utils.SuccessResponse{data=entities.BookItem}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /books/modules/{module_id}/items [post]
@@ -771,21 +825,32 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "invalid module id", "BAD_REQUEST", nil)
 	}
 
-	var req struct {
-		BookID        string `json:"book_id"`
-		Title         string `json:"title"`
-		Content       string `json:"content"`
-		Answer        string `json:"answer"`
-		Order         int    `json:"order"`
-		EstimateValue int    `json:"estimate_value"`
-		EstimateUnit  string `json:"estimate_unit"` // "seconds" | "minutes"
+	bookID := c.FormValue("book_id")
+	title := c.FormValue("title")
+	content := c.FormValue("content")
+	answer := c.FormValue("answer")
+	order := 0
+	estimateValue := 0
+	estimateUnit := c.FormValue("estimate_unit")
+
+	if v := c.FormValue("order"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			order = n
+		}
+	}
+	if v := c.FormValue("estimate_value"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			estimateValue = n
+		}
 	}
 
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	// Handle image upload (premium only)
+	imageURL, err := h.uploadItemImageIfPremium(c, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(req.BookID, &moduleID, userID, req.Title, req.Content, req.Answer, req.Order, req.EstimateValue, req.EstimateUnit)
+	item, err := h.bookSvc.AddItem(bookID, &moduleID, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -795,13 +860,19 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 
 // UpdateItem godoc
 // @Summary Update book item
-// @Description Update a book item
+// @Description Update a book item. Use multipart/form-data. Image upload (field: image) is only allowed for premium users.
 // @Tags Book Item
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Item ID"
-// @Param request body UpdateBookItemRequest true "Update item request"
+// @Param title formData string false "Item title"
+// @Param content formData string false "Item content"
+// @Param answer formData string false "Item answer"
+// @Param order formData int false "Item order"
+// @Param estimate_value formData int false "Estimate value"
+// @Param estimate_unit formData string false "Estimate unit (seconds or minutes)"
+// @Param image formData file false "Item image (premium only)"
 // @Success 200 {object} utils.SuccessResponse{data=entities.BookItem}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /books/items/{id} [put]
@@ -809,20 +880,31 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	itemID := c.Params("id")
 
-	var req struct {
-		Title         string `json:"title"`
-		Content       string `json:"content"`
-		Answer        string `json:"answer"`
-		Order         int    `json:"order"`
-		EstimateValue int    `json:"estimate_value"`
-		EstimateUnit  string `json:"estimate_unit"` // "seconds" | "minutes"
+	title := c.FormValue("title")
+	content := c.FormValue("content")
+	answer := c.FormValue("answer")
+	order := 0
+	estimateValue := 0
+	estimateUnit := c.FormValue("estimate_unit")
+
+	if v := c.FormValue("order"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			order = n
+		}
+	}
+	if v := c.FormValue("estimate_value"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			estimateValue = n
+		}
 	}
 
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	// Handle image upload (premium only)
+	imageURL, err := h.uploadItemImageIfPremium(c, userID)
+	if err != nil {
+		return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
 	}
 
-	item, err := h.bookSvc.UpdateItem(itemID, userID, req.Title, req.Content, req.Answer, req.Order, req.EstimateValue, req.EstimateUnit)
+	item, err := h.bookSvc.UpdateItem(itemID, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_ITEM_FAILED", nil)
 	}
