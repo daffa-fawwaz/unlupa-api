@@ -17,11 +17,36 @@ services:
       timeout: 3s
       retries: 10
 
+  supabase-health:
+    image: curlimages/curl:latest
+    container_name: hifzhun-supabase-health
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    entrypoint: >
+      sh -c "
+        echo 'Checking Supabase connectivity...' &&
+        curl -sf -o /dev/null
+          -H 'apikey: '\"$$SUPABASE_SERVICE_ROLE_KEY\"''
+          -H 'Authorization: Bearer '\"$$SUPABASE_SERVICE_ROLE_KEY\"''
+          \"$$SUPABASE_URL/rest/v1/\" &&
+        echo 'Supabase: healthy' ||
+        (echo 'Supabase: unreachable, continuing anyway' && exit 0)
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -H \"apikey: $$SUPABASE_SERVICE_ROLE_KEY\" -H \"Authorization: Bearer $$SUPABASE_SERVICE_ROLE_KEY\" \"$$SUPABASE_URL/rest/v1/\" && echo healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: hifzhun-api
+    env_file:
+      - .env
     environment:
       APP_PORT: "3000"
       DB_HOST: postgres
@@ -32,9 +57,14 @@ services:
       DB_SSLMODE: disable
       DB_TIMEZONE: Asia/Jakarta
       CACHE_DISABLED: "true"
-      JWT_SECRET: supersecret123   # ⬅️ TAMBAHKAN INI
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET}
     depends_on:
       postgres:
+        condition: service_healthy
+      supabase-health:
         condition: service_healthy
     ports:
       - "3000:3000"

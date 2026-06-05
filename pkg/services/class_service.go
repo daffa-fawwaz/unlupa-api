@@ -18,7 +18,7 @@ type ClassService interface {
 	CreateClass(teacherID uuid.UUID, name, description, classType, coverImage string) (*entities.Class, error)
 	GetMyClasses(teacherID uuid.UUID) ([]entities.Class, error)
 	GetClassDetail(classID string, userID uuid.UUID) (*entities.Class, error)
-	UpdateClass(classID string, teacherID uuid.UUID, name, description string, isActive *bool) (*entities.Class, error)
+	UpdateClass(classID string, teacherID uuid.UUID, name, description, coverImage string, isActive *bool) (*entities.Class, error)
 	DeleteClass(classID string, teacherID uuid.UUID) error
 	AddBookToClass(classID string, teacherID uuid.UUID, bookID string, order int) (*entities.ClassBook, error)
 	RemoveBookFromClass(classID string, teacherID uuid.UUID, bookID string) error
@@ -318,7 +318,7 @@ func (s *classService) GetClassDetail(classID string, userID uuid.UUID) (*entiti
 	return class, nil
 }
 
-func (s *classService) UpdateClass(classID string, teacherID uuid.UUID, name, description string, isActive *bool) (*entities.Class, error) {
+func (s *classService) UpdateClass(classID string, teacherID uuid.UUID, name, description, coverImage string, isActive *bool) (*entities.Class, error) {
 	class, err := s.classRepo.FindByID(classID)
 	if err != nil {
 		return nil, errors.New("class not found")
@@ -333,6 +333,9 @@ func (s *classService) UpdateClass(classID string, teacherID uuid.UUID, name, de
 	}
 	if description != "" {
 		class.Description = description
+	}
+	if coverImage != "" {
+		class.CoverImage = coverImage
 	}
 	if isActive != nil {
 		class.IsActive = *isActive
