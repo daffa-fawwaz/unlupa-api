@@ -96,13 +96,16 @@ func (h *ClassHandler) GetClassDetail(c *fiber.Ctx) error {
 
 // UpdateClass godoc
 // @Summary Update class
-// @Description Update class name, description, or active status
+// @Description Update class name, description, cover image, or active status
 // @Tags Class
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Class ID"
-// @Param request body UpdateClassRequest true "Update class request"
+// @Param name formData string false "Class name"
+// @Param description formData string false "Class description"
+// @Param is_active formData bool false "Active status"
+// @Param cover_image formData file false "Cover image file (png, jpg, jpeg, webp; max 3MB)"
 // @Success 200 {object} utils.SuccessResponse{data=entities.Class}
 // @Failure 400 {object} utils.ErrorResponse
 // @Failure 403 {object} utils.ErrorResponse
@@ -111,17 +114,21 @@ func (h *ClassHandler) UpdateClass(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 	classID := c.Params("id")
 
-	var req struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		IsActive    *bool  `json:"is_active"`
+	name := c.FormValue("name")
+	description := c.FormValue("description")
+
+	var isActive *bool
+	if v := c.FormValue("is_active"); v != "" {
+		b := v == "true" || v == "1"
+		isActive = &b
 	}
 
-	if err := c.BodyParser(&req); err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "invalid request body", "BAD_REQUEST", nil)
+	coverImage, err := uploadOptionalCoverImage(c)
+	if err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "BAD_REQUEST", nil)
 	}
 
-	class, err := h.classSvc.UpdateClass(classID, userID, req.Name, req.Description, req.IsActive)
+	class, err := h.classSvc.UpdateClass(classID, userID, name, description, coverImage, isActive)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_CLASS_FAILED", nil)
 	}

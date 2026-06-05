@@ -215,11 +215,13 @@ func (h *BookHandler) GetPublishedBookDetail(c *fiber.Ctx) error {
 // @Summary Update book
 // @Description Update book title, description, or cover image
 // @Tags Book
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Book ID"
-// @Param request body UpdateBookRequest true "Update book request"
+// @Param title formData string false "Book title"
+// @Param description formData string false "Book description"
+// @Param cover_image formData file false "Cover image file (png, jpg, jpeg, webp; max 3MB)"
 // @Success 200 {object} utils.SuccessResponse{data=entities.Book}
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /books/{id} [put]
