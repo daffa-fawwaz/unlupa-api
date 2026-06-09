@@ -165,6 +165,7 @@ type ItemDetailResponse struct {
 	JuzIndex               *int      `json:"juz_index,omitempty"`
 	Question               *string   `json:"question,omitempty"`
 	Answer                 *string   `json:"answer,omitempty"`
+	Image                  *string   `json:"image,omitempty"`
 }
 
 // GetDetail godoc
@@ -236,6 +237,10 @@ func (h *ItemStatusHandler) GetDetail(c *fiber.Ctx) error {
 				a := bi.Answer
 				resp.Question = &q
 				resp.Answer = &a
+				if bi.ImageURL != "" {
+					img := bi.ImageURL
+					resp.Image = &img
+				}
 			}
 		}
 	}
