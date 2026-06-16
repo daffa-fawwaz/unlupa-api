@@ -13,6 +13,7 @@ type ClassBookRepository interface {
 	FindByClassAndBook(classID, bookID string) (*entities.ClassBook, error)
 	IsBookAssignedToClass(bookID string) (bool, error)
 	IsBookAccessibleByMember(bookID, userID string) (bool, error)
+	CountByClassID(classID string) (int64, error)
 	Delete(id string) error
 	DeleteByClassID(classID string) error
 	DeleteByClassAndBook(classID, bookID string) error
@@ -72,6 +73,14 @@ func (r *classBookRepository) IsBookAccessibleByMember(bookID, userID string) (b
 		Where("class_books.book_id = ? AND class_members.user_id = ?", bookID, userID).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func (r *classBookRepository) CountByClassID(classID string) (int64, error) {
+	var count int64
+	err := r.db.Model(&entities.ClassBook{}).
+		Where("class_id = ?", classID).
+		Count(&count).Error
+	return count, err
 }
 
 func (r *classBookRepository) Delete(id string) error {

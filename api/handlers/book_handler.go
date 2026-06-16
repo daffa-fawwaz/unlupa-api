@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"mime/multipart"
 	"strconv"
 	"time"
 
@@ -55,8 +56,16 @@ func NewBookHandler(bookSvc services.BookService, userRepo repositories.UserRepo
 // "image" form file if present. Returns an error if the user is not premium but
 // tries to upload an image. Returns an empty string when no image is provided.
 func (h *BookHandler) uploadItemImageIfPremium(c *fiber.Ctx, userID uuid.UUID) (string, error) {
-	file, err := c.FormFile("image")
-	if err != nil || file == nil {
+	// Accept both "image" and "images" field names
+	var file *multipart.FileHeader
+	for _, field := range []string{"image", "images"} {
+		f, err := c.FormFile(field)
+		if err == nil && f != nil {
+			file = f
+			break
+		}
+	}
+	if file == nil {
 		// No image uploaded — allowed for everyone
 		return "", nil
 	}
@@ -862,25 +871,26 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 
 // UpdateItem godoc
 // @Summary Update book item
-// @Description Update a book item. Use multipart/form-data. Image upload (field: image) is only allowed for premium users.
+// @Description Update a book item. Use multipart/form-data. Pass remove_image=true to delete the existing image. Image upload (field: image) is only allowed for premium users.
 // @Tags Book Item
 // @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Item ID"
+// @Param item_id path string true "Item ID"
 // @Param title formData string false "Item title"
 // @Param content formData string false "Item content"
 // @Param answer formData string false "Item answer"
 // @Param order formData int false "Item order"
 // @Param estimate_value formData int false "Estimate value"
 // @Param estimate_unit formData string false "Estimate unit (seconds or minutes)"
-// @Param image formData file false "Item image (premium only)"
+// @Param remove_image formData bool false "Set to true to remove existing image"
+// @Param image formData file false "Item image (premium only; ignored if remove_image=true)"
 // @Success 200 {object} utils.SuccessResponse{data=entities.BookItem}
 // @Failure 400 {object} utils.ErrorResponse
-// @Router /books/items/{id} [put]
+// @Router /books/items/{item_id} [put]
 func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
-	itemID := c.Params("id")
+	itemID := c.Params("item_id")
 
 	title := c.FormValue("title")
 	content := c.FormValue("content")
@@ -888,6 +898,7 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 	order := 0
 	estimateValue := 0
 	estimateUnit := c.FormValue("estimate_unit")
+	removeImage := c.FormValue("remove_image") == "true" || c.FormValue("remove_image") == "1"
 
 	if v := c.FormValue("order"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -900,13 +911,17 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 		}
 	}
 
-	// Handle image upload (premium only)
-	imageURL, err := h.uploadItemImageIfPremium(c, userID)
-	if err != nil {
-		return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
+	// Handle image upload (premium only); skip if remove_image is set
+	var imageURL string
+	if !removeImage {
+		var err error
+		imageURL, err = h.uploadItemImageIfPremium(c, userID)
+		if err != nil {
+			return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
+		}
 	}
 
-	item, err := h.bookSvc.UpdateItem(itemID, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL)
+	item, err := h.bookSvc.UpdateItem(itemID, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL, removeImage)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_ITEM_FAILED", nil)
 	}
@@ -921,13 +936,13 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Item ID"
+// @Param item_id path string true "Item ID"
 // @Success 200 {object} utils.SuccessResponse
 // @Failure 400 {object} utils.ErrorResponse
-// @Router /books/items/{id} [delete]
+// @Router /books/items/{item_id} [delete]
 func (h *BookHandler) DeleteItem(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
-	itemID := c.Params("id")
+	itemID := c.Params("item_id")
 
 	if err := h.bookSvc.DeleteItem(itemID, userID); err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "DELETE_ITEM_FAILED", nil)

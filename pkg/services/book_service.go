@@ -9,6 +9,7 @@ import (
 	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
+	"hifzhun-api/pkg/utils"
 
 	"github.com/google/uuid"
 )
@@ -47,7 +48,7 @@ type BookService interface {
 
 	// Item CRUD
 	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error)
-	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error)
+	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string, removeImage bool) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
 
 	// Memorization
@@ -1172,7 +1173,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 	return item, nil
 }
 
-func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error) {
+func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string, removeImage bool) (*entities.BookItem, error) {
 	item, err := s.bookItemRepo.FindByID(itemID)
 	if err != nil {
 		return nil, errors.New("item not found")
@@ -1217,6 +1218,10 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 	}
 	if imageURL != "" {
 		item.ImageURL = imageURL
+	} else if removeImage {
+		// Delete the old image from Supabase Storage before clearing the field
+		_ = utils.DeleteFromSupabase(item.ImageURL)
+		item.ImageURL = ""
 	}
 	item.UpdatedAt = time.Now().In(config.AppLocation)
 
