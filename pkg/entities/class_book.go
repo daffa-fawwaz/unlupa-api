@@ -16,6 +16,9 @@ type ClassBook struct {
 
 	// Relations
 	Book Book `gorm:"foreignKey:BookID" json:"book,omitempty"`
+
+	// Computed fields
+	OwnerName string `gorm:"-" json:"owner_name"`
 }
 
 func (cb *ClassBook) BeforeCreate(tx *gorm.DB) error {

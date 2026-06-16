@@ -29,9 +29,24 @@ type DailyTaskResponse struct {
 	ImageURL               string    `json:"image_url,omitempty" example:"https://example.com/image.jpg"`
 }
 
+// DailyTaskSplit represents daily tasks split by source type
+type DailyTaskSplit struct {
+	Quran []DailyTaskResponse `json:"quran"`
+	Book  []DailyTaskResponse `json:"book"`
+}
+
 type DailyTaskGroup struct {
 	JuzIndex int                 `json:"juz_index" example:"30"`
 	Items    []DailyTaskResponse `json:"items"`
+}
+
+// isQuranSource returns true for sources that belong to the quran category
+func isQuranSource(source string) bool {
+	switch source {
+	case "quran", "interval", "interval_review", "graduate":
+		return true
+	}
+	return false
 }
 
 type DailyTaskHandler struct {
@@ -108,9 +123,21 @@ func (h *DailyTaskHandler) GenerateToday(c *fiber.Ctx) error {
 	cachePrefix := fmt.Sprintf("daily:%s:%s:", userID.String(), date)
 	h.cache.DeleteByPattern(c.Context(), cachePrefix+"*")
 
+	quranCount := 0
+	bookCount := 0
+	for _, t := range tasks {
+		if isQuranSource(t.Source) {
+			quranCount++
+		} else if t.Source == "book" {
+			bookCount++
+		}
+	}
+
 	return c.JSON(fiber.Map{
-		"task_date": date,
-		"count":     len(tasks),
+		"task_date":   date,
+		"count":       len(tasks),
+		"quran_count": quranCount,
+		"book_count":  bookCount,
 	})
 }
 
@@ -150,11 +177,15 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	cacheKey := fmt.Sprintf("daily:%s:%s:%s", userID.String(), date, group)
 	var cached []DailyTaskResponse
 	if h.cache.Get(c.Context(), cacheKey, &cached) {
-		if group == "juz" {
-			grouped := groupByJuz(cached)
-			return c.JSON(grouped)
+		split := splitBySource(cached)
+		switch group {
+		case "quran":
+			return c.JSON(groupByJuz(split.Quran))
+		case "book":
+			return c.JSON(split.Book)
+		default:
+			return c.JSON(split)
 		}
-		return c.JSON(cached)
 	}
 
 	tasks, err := h.service.ListToday(
@@ -320,12 +351,19 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 	ttl := time.Until(midnight)
 	h.cache.Set(c.Context(), cacheKey, resp, ttl)
 
-	if group == "juz" {
-		grouped := groupByJuz(resp)
-		return c.JSON(grouped)
-	}
+	split := splitBySource(resp)
 
-	return c.JSON(resp)
+	switch group {
+	case "quran":
+		// Only quran tasks, grouped by juz index
+		return c.JSON(groupByJuz(split.Quran))
+	case "book":
+		// Only book tasks
+		return c.JSON(split.Book)
+	default:
+		// Both quran and book split
+		return c.JSON(split)
+	}
 }
 
 func groupByJuz(items []DailyTaskResponse) []DailyTaskGroup {
@@ -352,4 +390,19 @@ func groupByJuz(items []DailyTaskResponse) []DailyTaskGroup {
 		result = append(result, DailyTaskGroup{JuzIndex: 0, Items: items0})
 	}
 	return result
+}
+
+func splitBySource(items []DailyTaskResponse) DailyTaskSplit {
+	split := DailyTaskSplit{
+		Quran: make([]DailyTaskResponse, 0),
+		Book:  make([]DailyTaskResponse, 0),
+	}
+	for _, it := range items {
+		if isQuranSource(it.Source) {
+			split.Quran = append(split.Quran, it)
+		} else {
+			split.Book = append(split.Book, it)
+		}
+	}
+	return split
 }

@@ -26,6 +26,7 @@ type Class struct {
 
 	OwnerName    string `gorm:"-" json:"owner_name"`
 	StudentCount int64  `gorm:"-" json:"student_count"`
+	BookCount    int64  `gorm:"-" json:"book_count"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

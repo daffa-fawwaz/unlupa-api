@@ -41,8 +41,8 @@ func RegisterBookRoutes(
 	books.Post("/modules/:module_id/items", bookHandler.AddItemToModule)
 
 	// Item static paths (before dynamic /:id)
-	books.Put("/items/:id", bookHandler.UpdateItem)
-	books.Delete("/items/:id", bookHandler.DeleteItem)
+	books.Put("/items/:item_id", bookHandler.UpdateItem)
+	books.Delete("/items/:item_id", bookHandler.DeleteItem)
 
 	// Dynamic book routes
 	books.Get("/:id", bookHandler.GetBookDetail)

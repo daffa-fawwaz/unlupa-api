@@ -3,6 +3,7 @@ package services
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -50,8 +51,8 @@ type ItemDetail struct {
 	IntervalEndAt *time.Time `json:"interval_end_at,omitempty"`
 	// Next review date (only for fsrs_active phase)
 	NextReviewAt *time.Time `json:"next_review_at,omitempty"`
-	// FSRS stability score (only for fsrs_active phase)
-	Stability float64 `json:"stability,omitempty" example:"5.5"`
+	// Stability in days (selisih next_review_at - last_review_at). "item belum masuk ujian" if not yet reviewed.
+	Stability string `json:"stability,omitempty" example:"14"`
 	// When the item was created
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -115,8 +116,8 @@ type PendingGraduation struct {
 	StudentName string `json:"student_name" example:"Ahmad Abdullah"`
 	// When the item was created
 	CreatedAt time.Time `json:"created_at"`
-	// FSRS stability score
-	Stability float64 `json:"stability" example:"35.5"`
+	// Stability in days (selisih next_review_at - last_review_at). "item belum masuk ujian" if not yet reviewed.
+	Stability string `json:"stability" example:"35"`
 	// Last interval days before pending
 	LastIntervalDays int `json:"last_interval_days" example:"32"`
 }
@@ -130,6 +131,35 @@ type classService struct {
 	itemRepo        *repositories.ItemRepository
 	juzRepo         *repositories.JuzRepository
 	juzItemRepo     *repositories.JuzItemRepository
+}
+
+// calculateItemStability returns the interval in days between last_review_at and next_review_at.
+// Both dates are normalized to midnight so the result is always a whole number of days.
+// Returns "item belum masuk ujian" if the item hasn't been reviewed yet.
+func calculateItemStability(item *entities.Item) string {
+	if item == nil {
+		return "item belum masuk ujian"
+	}
+
+	if item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal {
+		return "item belum masuk ujian"
+	}
+
+	if item.NextReviewAt != nil && item.LastReviewAt != nil {
+		loc := item.NextReviewAt.Location()
+		last := time.Date(
+			item.LastReviewAt.Year(), item.LastReviewAt.Month(), item.LastReviewAt.Day(),
+			0, 0, 0, 0, loc,
+		)
+		next := time.Date(
+			item.NextReviewAt.Year(), item.NextReviewAt.Month(), item.NextReviewAt.Day(),
+			0, 0, 0, 0, loc,
+		)
+		interval := next.Sub(last).Hours() / 24
+		return fmt.Sprintf("%.0f", interval)
+	}
+
+	return "item belum masuk ujian"
 }
 
 func itemBelongsToClassBooks(item entities.Item, classBooks []entities.ClassBook) bool {
@@ -195,6 +225,12 @@ func (s *classService) enrichClassSummary(class *entities.Class) error {
 		return err
 	}
 	class.StudentCount = studentCount
+
+	bookCount, err := s.classBookRepo.CountByClassID(class.ID.String())
+	if err != nil {
+		return err
+	}
+	class.BookCount = bookCount
 
 	return nil
 }
@@ -313,6 +349,10 @@ func (s *classService) GetClassDetail(classID string, userID uuid.UUID) (*entiti
 		if err != nil {
 			return nil, errors.New("you don't have access to this class")
 		}
+	}
+
+	if err := s.enrichClassSummary(class); err != nil {
+		return nil, err
 	}
 
 	return class, nil
@@ -508,11 +548,11 @@ func (s *classService) GetStudentProgress(classID string, teacherID uuid.UUID) (
 			case entities.ItemStatusFSRSActive:
 				progress.FSRSActive++
 				itemDetail.NextReviewAt = item.NextReviewAt
-				itemDetail.Stability = item.Stability
+				itemDetail.Stability = calculateItemStability(&item)
 			case entities.ItemStatusPendingGraduate:
 				progress.PendingGraduate++
 				itemDetail.NextReviewAt = item.NextReviewAt
-				itemDetail.Stability = item.Stability
+				itemDetail.Stability = calculateItemStability(&item)
 			case entities.ItemStatusGraduate:
 				progress.Graduate++
 			case entities.ItemStatusInactive:
@@ -565,6 +605,10 @@ func (s *classService) JoinClass(userID uuid.UUID, classCode string) (*entities.
 		return nil, err
 	}
 
+	if err := s.enrichClassSummary(class); err != nil {
+		return nil, err
+	}
+
 	return class, nil
 }
 
@@ -589,7 +633,9 @@ func (s *classService) GetMyJoinedClasses(userID uuid.UUID) ([]entities.Class, e
 		if err != nil {
 			continue
 		}
-		classes = append(classes, *class)
+		if err := s.enrichClassSummary(class); err == nil {
+			classes = append(classes, *class)
+		}
 	}
 
 	return classes, nil
@@ -613,7 +659,22 @@ func (s *classService) GetClassBooks(classID string, userID uuid.UUID) ([]entiti
 		return nil, errors.New("this class does not contain books")
 	}
 
-	return s.classBookRepo.FindByClassID(classID)
+	classBooks, err := s.classBookRepo.FindByClassID(classID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range classBooks {
+		owner, err := s.userRepo.FindByID(classBooks[i].Book.OwnerID.String())
+		if err == nil {
+			classBooks[i].OwnerName = owner.FullName
+			if classBooks[i].OwnerName == "" {
+				classBooks[i].OwnerName = owner.Email
+			}
+		}
+	}
+
+	return classBooks, nil
 }
 
 func (s *classService) GetClassMembers(classID string, userID uuid.UUID) ([]MemberInfo, error) {
@@ -706,7 +767,7 @@ func (s *classService) GetPendingGraduations(classID string, teacherID uuid.UUID
 					StudentEmail:     user.Email,
 					StudentName:      user.FullName,
 					CreatedAt:        item.CreatedAt,
-					Stability:        item.Stability,
+					Stability:        calculateItemStability(&item),
 					LastIntervalDays: intervalDays,
 				})
 			}

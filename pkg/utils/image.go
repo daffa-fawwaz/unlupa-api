@@ -185,3 +185,56 @@ func escapeObjectPath(path string) string {
 	}
 	return strings.Join(parts, "/")
 }
+
+// DeleteFromSupabase removes an object from Supabase Storage given its public URL.
+// It is a no-op when Supabase is not configured or the URL is empty / not a Supabase URL.
+func DeleteFromSupabase(publicURL string) error {
+	if publicURL == "" {
+		return nil
+	}
+	if !supabaseStorageConfigured() {
+		return nil
+	}
+
+	baseURL := supabaseBaseURL()
+	bucket := os.Getenv("SUPABASE_BUCKET")
+
+	// Extract object path from public URL.
+	// Expected format: {baseURL}/storage/v1/object/public/{bucket}/{objectPath}
+	prefix := fmt.Sprintf("%s/storage/v1/object/public/%s/", baseURL, url.PathEscape(bucket))
+	if !strings.HasPrefix(publicURL, prefix) {
+		// Not a Supabase URL we manage — skip silently
+		return nil
+	}
+
+	objectPath, err := url.PathUnescape(publicURL[len(prefix):])
+	if err != nil {
+		objectPath = publicURL[len(prefix):]
+	}
+
+	deleteURL := fmt.Sprintf("%s/storage/v1/object/%s", baseURL, url.PathEscape(bucket))
+	body := fmt.Sprintf(`{"prefixes":["%s"]}`, strings.ReplaceAll(objectPath, `"`, `\"`))
+
+	req, err := http.NewRequest(http.MethodDelete, deleteURL, strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create supabase delete request: %w", err)
+	}
+
+	apiKey := supabaseAPIKey()
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("apikey", apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete image from supabase: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("supabase delete failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	return nil
+}
