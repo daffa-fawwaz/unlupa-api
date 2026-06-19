@@ -14,5 +14,6 @@ func UserRoutes(router fiber.Router, teacherReqHandler *handlers.TeacherRequestH
 	)
 
 	user.Post("/teacher-request", teacherReqHandler.RequestTeacher)
+	user.Get("/teacher-request/status", teacherReqHandler.GetMyRequestStatus)
 	user.Get("/teacher-request", teacherReqHandler.GetMyRequest)
 }
