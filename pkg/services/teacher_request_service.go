@@ -6,11 +6,19 @@ import (
 	"hifzhun-api/pkg/repositories"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
+
+type TeacherRequestStatus struct {
+	Status     string `json:"status"`
+	CanRequest bool   `json:"can_request"`
+	RequestID  string `json:"request_id,omitempty"`
+}
 
 type TeacherRequestService interface {
 	RequestTeacher(userID uuid.UUID, message string) error
 	GetMyRequest(userID uuid.UUID) (*entities.TeacherRequest, error)
+	GetMyRequestStatus(userID uuid.UUID) (*TeacherRequestStatus, error)
 	GetPendingRequests() ([]entities.TeacherRequest, error)
 	ApproveRequest(id string) error
 	RejectRequest(id string) error
@@ -57,6 +65,44 @@ func (s *teacherRequestService) RequestTeacher(userID uuid.UUID, message string)
 
 func (s *teacherRequestService) GetMyRequest(userID uuid.UUID) (*entities.TeacherRequest, error) {
 	return s.teacherReqRepo.FindByUserID(userID)
+}
+
+func (s *teacherRequestService) GetMyRequestStatus(userID uuid.UUID) (*TeacherRequestStatus, error) {
+	user, err := s.userRepo.FindByID(userID.String())
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	if user.Role == "teacher" {
+		return &TeacherRequestStatus{
+			Status:     "approved",
+			CanRequest: false,
+		}, nil
+	}
+
+	if user.Role == "admin" {
+		return &TeacherRequestStatus{
+			Status:     "none",
+			CanRequest: false,
+		}, nil
+	}
+
+	req, err := s.teacherReqRepo.FindByUserID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &TeacherRequestStatus{
+				Status:     "none",
+				CanRequest: true,
+			}, nil
+		}
+		return nil, err
+	}
+
+	return &TeacherRequestStatus{
+		Status:     req.Status,
+		CanRequest: req.Status == "rejected",
+		RequestID:  req.ID.String(),
+	}, nil
 }
 
 func (s *teacherRequestService) GetPendingRequests() ([]entities.TeacherRequest, error) {

@@ -87,6 +87,28 @@ Response (201):
 
 ---
 
+### Get My Teacher Request Status
+**GET** `/user/teacher-request/status`
+
+Response (200):
+```json
+{
+  "status": 200,
+  "message": "teacher request status fetched successfully",
+  "data": {
+    "status": "none|pending|approved|rejected",
+    "can_request": true,
+    "request_id": "uuid"
+  }
+}
+```
+
+Notes:
+- `request_id` is only present when the user has submitted a request before
+- `can_request` is `true` when the user has no request or their latest request was rejected
+
+---
+
 ### Get My Teacher Request
 **GET** `/user/teacher-request`
 

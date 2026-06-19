@@ -63,16 +63,49 @@ func (h *TeacherRequestHandler) RequestTeacher(c *fiber.Ctx) error {
 	)
 }
 
+// GetMyRequestStatus godoc
+// @Summary Get my teacher request status
+// @Description Get the current user's teacher request status summary
+// @Tags Teacher Request
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} utils.SuccessResponse{data=services.TeacherRequestStatus}
+// @Failure 404 {object} utils.ErrorResponse
+// @Router /user/teacher-request/status [get]
+func (h *TeacherRequestHandler) GetMyRequestStatus(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+
+	status, err := h.teacherReqSvc.GetMyRequestStatus(userID)
+	if err != nil {
+		return utils.Error(
+			c,
+			fiber.StatusNotFound,
+			err.Error(),
+			"NOT_FOUND",
+			nil,
+		)
+	}
+
+	return utils.Success(
+		c,
+		fiber.StatusOK,
+		"teacher request status fetched successfully",
+		status,
+		nil,
+	)
+}
+
 // GetMyRequest godoc
 // @Summary Get my teacher request
-// @Description Get the current user's teacher request status
+// @Description Get the current user's teacher request details
 // @Tags Teacher Request
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} utils.SuccessResponse{data=entities.TeacherRequest}
 // @Failure 404 {object} utils.ErrorResponse
-// @Router /teacher-request/my [get]
+// @Router /user/teacher-request [get]
 func (h *TeacherRequestHandler) GetMyRequest(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uuid.UUID)
 
