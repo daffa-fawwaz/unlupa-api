@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"math"
 	"strings"
@@ -11,23 +12,27 @@ import (
 	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
+	"hifzhun-api/pkg/utils"
 )
 
 type ItemStatusService struct {
-	itemRepo           *repositories.ItemRepository
-	intervalReviewRepo *repositories.IntervalReviewLogRepository
-	classBookRepo      repositories.ClassBookRepository
+	itemRepo            *repositories.ItemRepository
+	intervalReviewRepo  *repositories.IntervalReviewLogRepository
+	classBookRepo       repositories.ClassBookRepository
+	dailyTaskActionRepo repositories.DailyTaskActionRepository
 }
 
 func NewItemStatusService(
 	itemRepo *repositories.ItemRepository,
 	intervalReviewRepo *repositories.IntervalReviewLogRepository,
 	classBookRepo repositories.ClassBookRepository,
+	dailyTaskActionRepo repositories.DailyTaskActionRepository,
 ) *ItemStatusService {
 	return &ItemStatusService{
-		itemRepo:           itemRepo,
-		intervalReviewRepo: intervalReviewRepo,
-		classBookRepo:      classBookRepo,
+		itemRepo:            itemRepo,
+		intervalReviewRepo:  intervalReviewRepo,
+		classBookRepo:       classBookRepo,
+		dailyTaskActionRepo: dailyTaskActionRepo,
 	}
 }
 
@@ -215,6 +220,16 @@ func (s *ItemStatusService) ReviewInterval(itemID uuid.UUID, userID uuid.UUID, r
 		return nil, err
 	}
 
+	// Mark the corresponding daily_task as done
+	taskDate := utils.NormalizeDate(now)
+	_ = s.dailyTaskActionRepo.UpdateStateByItemID(
+		context.Background(),
+		userID,
+		taskDate,
+		itemID,
+		"done",
+	)
+
 	return &IntervalReviewResult{
 		Item:         item,
 		NextReviewAt: &nextReview,
@@ -348,7 +363,23 @@ func (s *ItemStatusService) ActivateFSRS(item *entities.Item) error {
 		return errors.New("item must be in 'interval' status")
 	}
 
+	now := time.Now().In(config.AppLocation)
+	nextDay := now.AddDate(0, 0, 1)
+	nextReview := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, config.AppLocation)
+
 	item.Status = entities.ItemStatusFSRSActive
+	item.IntervalEndAt = &now
+	if item.FSRSStartAt == nil {
+		item.FSRSStartAt = &now
+	}
+	item.NextReviewAt = &nextReview
+	if math.IsNaN(item.Stability) || math.IsInf(item.Stability, 0) || item.Stability <= 0 {
+		item.Stability = 0.4
+	}
+	if math.IsNaN(item.Difficulty) || math.IsInf(item.Difficulty, 0) || item.Difficulty <= 0 {
+		item.Difficulty = 5.0
+	}
+
 	return s.itemRepo.Update(item)
 }
 

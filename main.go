@@ -145,7 +145,7 @@ func main() {
 
 	// ================= ITEM STATUS =================
 	intervalReviewLogRepo := repositories.NewIntervalReviewLogRepository(config.DB)
-	itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo, classBookRepo)
+	itemStatusSvc := services.NewItemStatusService(itemRepo, intervalReviewLogRepo, classBookRepo, dailyTaskActionRepo)
 	itemStatusHandler := handlers.NewItemStatusHandler(itemStatusSvc, juzItemRepo, bookRepo, bookItemRepo, itemRepo, appCache)
 
 	// ================= CLASS =================
@@ -159,6 +159,21 @@ func main() {
 	// ================= MY ITEMS =================
 	myItemSvc := services.NewMyItemService(itemRepo, juzItemRepo, bookRepo, bookItemRepo)
 	myItemHandler := handlers.NewMyItemHandler(myItemSvc, appCache)
+
+	// ================= CLASS DAILY =================
+	classDailyHandler := handlers.NewClassDailyHandler(
+		dailyTaskSvc,
+		dailyTaskRepo,
+		itemRepo,
+		juzRepo,
+		juzItemRepo,
+		classMemberRepo,
+		classRepo,
+		classBookRepo,
+		bookRepo,
+		bookItemRepo,
+		appCache,
+	)
 
 	// ================= ROUTES =================
 	routes.SetupRoutes(
@@ -176,6 +191,7 @@ func main() {
 		bookHandler,
 		classHandler,
 		myItemHandler,
+		classDailyHandler,
 	)
 
 	port := os.Getenv("APP_PORT")

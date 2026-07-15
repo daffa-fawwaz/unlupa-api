@@ -21,6 +21,7 @@ func SetupRoutes(
 	bookHandler *handlers.BookHandler,
 	classHandler *handlers.ClassHandler,
 	myItemHandler *handlers.MyItemHandler,
+	classDailyHandler *handlers.ClassDailyHandler,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
@@ -36,6 +37,7 @@ func SetupRoutes(
 	RegisterBookRoutes(v1, bookHandler)
 	RegisterClassRoutes(v1, classHandler)
 	RegisterMyItemRoutes(v1, myItemHandler)
+	RegisterClassDailyRoutes(v1, classDailyHandler)
 	v1.Get("/health", handlers.Health)
 }
 
