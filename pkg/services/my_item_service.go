@@ -2,6 +2,7 @@ package services
 
 import (
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -9,14 +10,28 @@ import (
 	"hifzhun-api/pkg/repositories"
 )
 
+// nextReviewFor returns the appropriate next_review timestamp for an item
+// based on its current status.
+func nextReviewFor(item entities.Item) *time.Time {
+	switch item.Status {
+	case entities.ItemStatusInterval:
+		return item.IntervalNextReviewAt
+	case entities.ItemStatusFSRSActive, entities.ItemStatusGraduate, entities.ItemStatusPendingGraduate:
+		return item.NextReviewAt
+	default:
+		return nil
+	}
+}
+
 // ==================== Response Types ====================
 
 type MyItemDetail struct {
-	ItemID      uuid.UUID `json:"item_id"`
-	ContentRef  string    `json:"content_ref"`
-	Status      string    `json:"status"`
-	ReviewCount int       `json:"review_count"`
-	CreatedAt   string    `json:"created_at"`
+	ItemID      uuid.UUID  `json:"item_id"`
+	ContentRef  string     `json:"content_ref"`
+	Status      string     `json:"status"`
+	ReviewCount int        `json:"review_count"`
+	NextReview  *time.Time `json:"next_review"`
+	CreatedAt   string     `json:"created_at"`
 }
 
 type QuranItemDetail struct {
@@ -131,6 +146,7 @@ func (s *MyItemService) GetMyQuranItems(userID uuid.UUID, classID string) (*MyIt
 				ContentRef:  item.ContentRef,
 				Status:      item.Status,
 				ReviewCount: item.ReviewCount,
+				NextReview:  nextReviewFor(item),
 				CreatedAt:   item.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			},
 		})
@@ -229,6 +245,7 @@ func (s *MyItemService) GetMyBookItems(userID uuid.UUID) (*MyItemsBookResponse, 
 				ContentRef:  item.ContentRef,
 				Status:      item.Status,
 				ReviewCount: item.ReviewCount,
+				NextReview:  nextReviewFor(item),
 				CreatedAt:   item.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			},
 			BookItemTitle: bookItemTitleMap[ref.BookItemID],
