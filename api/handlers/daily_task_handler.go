@@ -321,17 +321,28 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 		}
 	}
 
-	// Batch fetch juz indexes
+	// Batch fetch juz info to also get class_id
 	juzMap := make(map[string]int) // item_id string -> juz_index
+	classScopeMap := make(map[string]bool) // item_id string -> is_in_class
 	if len(itemIDStrings) > 0 {
-		juzResult, err := h.juzItemRepo.FindJuzIndexByItemIDs(itemIDStrings)
+		juzInfoResult, err := h.juzItemRepo.FindJuzInfoByItemIDs(itemIDStrings)
 		if err == nil {
-			juzMap = juzResult
+			for itemID, info := range juzInfoResult {
+				juzMap[itemID] = info.JuzIndex
+				if info.ClassID != nil {
+					classScopeMap[itemID] = true
+				}
+			}
 		}
 	}
 
 	resp := make([]DailyTaskResponse, 0, len(tasks))
 	for _, t := range tasks {
+		// Filter out quran items that belong to a class (so they don't appear in personal daily tasks)
+		if isQuranSource(t.Source) && classScopeMap[t.ItemID.String()] {
+			continue
+		}
+
 		resp = append(resp, DailyTaskResponse{
 			ItemID:                 t.ItemID,
 			Source:                 t.Source,
