@@ -113,6 +113,7 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("daily:%s:%s:*", userID.String(), date))
 	// Bust class-daily cache for all classes this user belongs to
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("class-daily:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("class-daily-book:%s:*", userID.String()))
 
 	return utils.Success(c, fiber.StatusOK, message, resp, nil)
 }

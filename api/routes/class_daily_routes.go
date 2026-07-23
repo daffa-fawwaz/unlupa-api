@@ -17,4 +17,9 @@ func RegisterClassDailyRoutes(
 		middlewares.JWTAuth(),
 		handler.ListClassDaily,
 	)
+	router.Get(
+		"/class-daily-book",
+		middlewares.JWTAuth(),
+		handler.ListClassDailyBook,
+	)
 }

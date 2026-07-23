@@ -203,6 +203,7 @@ func (s *bookService) canAccessClassBook(bookID string, ownerID uuid.UUID, userI
 		return false
 	}
 
+	// Book owner always has access
 	if ownerID == *userID {
 		return true
 	}
@@ -211,8 +212,15 @@ func (s *bookService) canAccessClassBook(bookID string, ownerID uuid.UUID, userI
 		return false
 	}
 
-	allowed, err := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
-	return err == nil && allowed
+	// Student who joined a class containing this book
+	memberOK, err := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
+	if err == nil && memberOK {
+		return true
+	}
+
+	// Teacher (guru) of a class that contains this book
+	teacherOK, err := s.classBookRepo.IsBookAccessibleByTeacher(bookID, userID.String())
+	return err == nil && teacherOK
 }
 
 func (s *bookService) canViewBook(book *entities.Book, userID *uuid.UUID, role string) bool {
