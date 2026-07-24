@@ -203,6 +203,31 @@ func (r *ItemRepository) FindByOwnerAndBookIDs(ownerID uuid.UUID, bookIDs []stri
 	return items, err
 }
 
+// FindClassBookItemIDsByUser returns a set of item IDs owned by userID that belong to
+// books assigned to any class. Used to exclude class-book items from the general daily feed.
+func (r *ItemRepository) FindClassBookItemIDsByUser(ownerID uuid.UUID) (map[uuid.UUID]struct{}, error) {
+	type row struct {
+		ItemID string `gorm:"column:id"`
+	}
+	var rows []row
+	err := r.db.Raw(`
+		SELECT DISTINCT i.id
+		FROM items i
+		JOIN class_books cb ON i.content_ref LIKE CONCAT('book:', cb.book_id::text, ':%')
+		WHERE i.owner_id = ? AND i.source_type = 'book'
+	`, ownerID).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uuid.UUID]struct{}, len(rows))
+	for _, r := range rows {
+		if id, parseErr := uuid.Parse(r.ItemID); parseErr == nil {
+			result[id] = struct{}{}
+		}
+	}
+	return result, nil
+}
+
 // FindEligibleForGraduationByStability finds fsrs_active Quran items with stability >= threshold
 func (r *ItemRepository) FindEligibleForGraduationByStability(ownerID uuid.UUID, stabilityThreshold float64) ([]entities.Item, error) {
 	var items []entities.Item

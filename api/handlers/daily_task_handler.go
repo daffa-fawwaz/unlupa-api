@@ -50,12 +50,13 @@ func isQuranSource(source string) bool {
 }
 
 type DailyTaskHandler struct {
-	service      services.DailyTaskService
-	itemRepo     *repositories.ItemRepository
-	juzItemRepo  *repositories.JuzItemRepository
-	bookRepo     repositories.BookRepository
-	bookItemRepo repositories.BookItemRepository
-	cache        *cache.Cache
+	service       services.DailyTaskService
+	itemRepo      *repositories.ItemRepository
+	juzItemRepo   *repositories.JuzItemRepository
+	bookRepo      repositories.BookRepository
+	bookItemRepo  repositories.BookItemRepository
+	classBookRepo repositories.ClassBookRepository
+	cache         *cache.Cache
 }
 
 func NewDailyTaskHandler(
@@ -64,15 +65,17 @@ func NewDailyTaskHandler(
 	juzItemRepo *repositories.JuzItemRepository,
 	bookRepo repositories.BookRepository,
 	bookItemRepo repositories.BookItemRepository,
+	classBookRepo repositories.ClassBookRepository,
 	c *cache.Cache,
 ) *DailyTaskHandler {
 	return &DailyTaskHandler{
-		service:      service,
-		itemRepo:     itemRepo,
-		juzItemRepo:  juzItemRepo,
-		bookRepo:     bookRepo,
-		bookItemRepo: bookItemRepo,
-		cache:        c,
+		service:       service,
+		itemRepo:      itemRepo,
+		juzItemRepo:   juzItemRepo,
+		bookRepo:      bookRepo,
+		bookItemRepo:  bookItemRepo,
+		classBookRepo: classBookRepo,
+		cache:         c,
 	}
 }
 
@@ -209,6 +212,23 @@ func (h *DailyTaskHandler) ListToday(c *fiber.Ctx) error {
 			tasks = gen
 			// Drop any stale cache for this date
 			h.cache.Delete(c.Context(), cacheKey)
+		}
+	}
+
+	// ── Exclude items that belong to a class book ─────────────────────────────
+	// Book items assigned to a class should only appear in /class-daily-book,
+	// not in the general /daily feed.
+	if h.classBookRepo != nil {
+		classBookItemIDs, cbErr := h.itemRepo.FindClassBookItemIDsByUser(userID)
+		if cbErr == nil && len(classBookItemIDs) > 0 {
+			filtered := tasks[:0]
+			for _, t := range tasks {
+				if _, isClassBook := classBookItemIDs[t.ItemID]; isClassBook {
+					continue
+				}
+				filtered = append(filtered, t)
+			}
+			tasks = filtered
 		}
 	}
 
