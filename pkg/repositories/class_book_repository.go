@@ -13,6 +13,8 @@ type ClassBookRepository interface {
 	FindByClassAndBook(classID, bookID string) (*entities.ClassBook, error)
 	IsBookAssignedToClass(bookID string) (bool, error)
 	IsBookAccessibleByMember(bookID, userID string) (bool, error)
+	// IsBookAccessibleByTeacher returns true when userID is the guru of any class that contains bookID.
+	IsBookAccessibleByTeacher(bookID, userID string) (bool, error)
 	CountByClassID(classID string) (int64, error)
 	Delete(id string) error
 	DeleteByClassID(classID string) error
@@ -71,6 +73,16 @@ func (r *classBookRepository) IsBookAccessibleByMember(bookID, userID string) (b
 	err := r.db.Model(&entities.ClassBook{}).
 		Joins("JOIN class_members ON class_members.class_id = class_books.class_id").
 		Where("class_books.book_id = ? AND class_members.user_id = ?", bookID, userID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+// IsBookAccessibleByTeacher returns true when userID is the guru_id of any class that contains bookID.
+func (r *classBookRepository) IsBookAccessibleByTeacher(bookID, userID string) (bool, error) {
+	var count int64
+	err := r.db.Model(&entities.ClassBook{}).
+		Joins("JOIN classes ON classes.id = class_books.class_id").
+		Where("class_books.book_id = ? AND classes.guru_id = ?", bookID, userID).
 		Count(&count).Error
 	return count > 0, err
 }

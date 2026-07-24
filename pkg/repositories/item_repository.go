@@ -174,6 +174,35 @@ func (r *ItemRepository) CountDistinctOwnersByBookID(bookID string) (int64, erro
 	return count, err
 }
 
+// FindByOwnerAndBookIDs finds book items owned by user whose content_ref starts with any of the given book IDs.
+func (r *ItemRepository) FindByOwnerAndBookIDs(ownerID uuid.UUID, bookIDs []string) ([]entities.Item, error) {
+	if len(bookIDs) == 0 {
+		return nil, nil
+	}
+	// Build LIKE conditions: content_ref LIKE 'book:{id}:%'
+	var items []entities.Item
+	query := r.db.Where("owner_id = ? AND source_type = 'book'", ownerID)
+
+	likes := make([]string, len(bookIDs))
+	args := make([]interface{}, len(bookIDs))
+	for i, id := range bookIDs {
+		likes[i] = "content_ref LIKE ?"
+		args[i] = "book:" + id + ":%"
+	}
+
+	// Join conditions with OR
+	orClause := likes[0]
+	orArgs := []interface{}{args[0]}
+	for i := 1; i < len(likes); i++ {
+		orClause += " OR " + likes[i]
+		orArgs = append(orArgs, args[i])
+	}
+	query = query.Where(orClause, orArgs...)
+
+	err := query.Find(&items).Error
+	return items, err
+}
+
 // FindEligibleForGraduationByStability finds fsrs_active Quran items with stability >= threshold
 func (r *ItemRepository) FindEligibleForGraduationByStability(ownerID uuid.UUID, stabilityThreshold float64) ([]entities.Item, error) {
 	var items []entities.Item

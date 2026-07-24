@@ -145,6 +145,7 @@ func (h *ItemStatusHandler) ReviewInterval(c *fiber.Ctx) error {
 	h.invalidateItemCaches(c, userID)
 	// Bust class-daily cache for all classes this user belongs to
 	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("class-daily:%s:*", userID.String()))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("class-daily-book:%s:*", userID.String()))
 
 	return utils.Success(c, fiber.StatusOK, "Interval review submitted", resp, nil)
 }
