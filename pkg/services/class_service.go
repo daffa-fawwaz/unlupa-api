@@ -773,8 +773,9 @@ func (s *classService) GetClassBookStudentProgress(classID, bookID string, teach
 		stabilityTotal := 0.0
 		startedStabilityCount := 0
 		totalUnreviewed := 0
-		totalFsrsActive := 0
 		totalInactive := 0
+
+		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 		for _, item := range items {
 			_, bookItemID, ok := strings.Cut(item.ContentRef, "book:"+bookID+":item:")
@@ -808,18 +809,20 @@ func (s *classService) GetClassBookStudentProgress(classID, bookID string, teach
 				student.Inactive++
 			}
 
-			if item.Status == entities.ItemStatusInactive {
+			if item.Status == entities.ItemStatusGraduate || item.Status == entities.ItemStatusInactive {
 				totalInactive++
 			} else {
 				taskState, hasTask := dailyTaskState[item.ID]
 				isTaskCompleted := hasTask && (taskState == "done" || taskState == "completed")
-				isDue := item.NextReviewAt == nil || !item.NextReviewAt.After(endOfDay) || (item.IntervalNextReviewAt != nil && !item.IntervalNextReviewAt.After(endOfDay))
+				isReviewedToday := isTaskCompleted || (item.LastReviewAt != nil && !item.LastReviewAt.Before(startOfDay) && !item.LastReviewAt.After(endOfDay))
 
-				// Outstanding review obligation for today
-				if (hasTask && !isTaskCompleted) || (isDue && !isTaskCompleted) || item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal {
+				// Item is strictly due if it has an uncompleted daily task or scheduled deadline <= endOfDay
+				isDueBySchedule := (item.NextReviewAt != nil && !item.NextReviewAt.After(endOfDay)) || (item.IntervalNextReviewAt != nil && !item.IntervalNextReviewAt.After(endOfDay))
+				isDue := (hasTask && !isTaskCompleted) || isDueBySchedule
+
+				// Outstanding review obligation for today: must be due and not reviewed today
+				if isDue && !isReviewedToday {
 					totalUnreviewed++
-				} else {
-					totalFsrsActive++
 				}
 			}
 
@@ -845,7 +848,6 @@ func (s *classService) GetClassBookStudentProgress(classID, bookID string, teach
 		}
 
 		student.TotalUnreviewed = totalUnreviewed
-		student.TotalFSRSActive = totalFsrsActive
 		student.TotalInactive = totalInactive
 
 		if result.TotalBookItems > 0 {
