@@ -79,6 +79,7 @@ func (r *dailyTaskRepository) UpsertDailyTasks(
 				t.State = state
 			}
 			toInsert = append(toInsert, t)
+			existingItemIDs[t.ItemID] = struct{}{}
 		}
 
 		if len(toInsert) == 0 {

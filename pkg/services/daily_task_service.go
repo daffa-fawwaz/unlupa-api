@@ -269,7 +269,7 @@ func (s *dailyTaskService) GenerateToday(
 	}
 
 	if targetJuzIndex > 0 {
-		gradItems, err := s.itemRepo.FindGraduateItemsByJuzDay(userID, targetJuzIndex)
+		gradItems, err := s.itemRepo.FindGraduateItemsByJuzDay(userID, targetJuzIndex, now)
 		if err != nil {
 			return nil, err
 		}
