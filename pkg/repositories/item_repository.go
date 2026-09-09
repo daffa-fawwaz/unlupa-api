@@ -183,14 +183,17 @@ func (r *ItemRepository) FindFSRSDueItems(ownerID uuid.UUID, now time.Time) ([]e
 	return items, err
 }
 
-// FindGraduateItemsByJuzDay finds graduated items where juz.index = dayOfMonth
-func (r *ItemRepository) FindGraduateItemsByJuzDay(ownerID uuid.UUID, dayOfMonth int) ([]entities.Item, error) {
+// FindGraduateItemsByJuzDay finds graduated items where juz.index = dayOfMonth and next_review_at <= endOfDay
+func (r *ItemRepository) FindGraduateItemsByJuzDay(ownerID uuid.UUID, dayOfMonth int, now time.Time) ([]entities.Item, error) {
 	var items []entities.Item
+	endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
+
 	err := r.db.
+		Distinct("items.*").
 		Joins("JOIN juz_items ON juz_items.item_id = items.id").
 		Joins("JOIN juzs ON juzs.id = juz_items.juz_id").
-		Where("items.owner_id = ? AND items.status = ? AND juzs.index = ?",
-			ownerID, entities.ItemStatusGraduate, dayOfMonth).
+		Where("items.owner_id = ? AND items.status = ? AND juzs.index = ? AND items.next_review_at IS NOT NULL AND items.next_review_at <= ?",
+			ownerID, entities.ItemStatusGraduate, dayOfMonth, endOfDay).
 		Find(&items).Error
 	return items, err
 }
