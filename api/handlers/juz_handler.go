@@ -112,8 +112,7 @@ func (h *JuzHandler) Activate(c *fiber.Ctx) error {
 
 	h.invalidateJuzCache(c, userID)
 	// Invalidate today's daily cache so next generate/list reflects change
-	date := time.Now().In(config.AppLocation).Format("2006-01-02")
-	h.cache.Delete(c.Context(), fmt.Sprintf("daily:%s:%s", userID.String(), date))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("daily:%s:*", userID.String()))
 	return utils.Success(c, fiber.StatusOK, "Juz activated", map[string]any{"index": juzIndex, "active": true}, nil)
 }
 
@@ -147,8 +146,7 @@ func (h *JuzHandler) Deactivate(c *fiber.Ctx) error {
 
 	h.invalidateJuzCache(c, userID)
 	// Invalidate today's daily cache so next generate/list reflects change
-	date := time.Now().In(config.AppLocation).Format("2006-01-02")
-	h.cache.Delete(c.Context(), fmt.Sprintf("daily:%s:%s", userID.String(), date))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("daily:%s:*", userID.String()))
 	return utils.Success(c, fiber.StatusOK, "Juz deactivated", map[string]any{"index": juzIndex, "active": false}, nil)
 }
 

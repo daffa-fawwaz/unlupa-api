@@ -27,10 +27,16 @@ func Health(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(fiber.Map{
+	res := fiber.Map{
 		"status": "ok",
 		"time":   time.Now().UTC().Format(time.RFC3339),
 		"db":     dbOK,
 		"redis":  redisOK,
-	})
+	}
+
+	if poolStats, ok := config.GetDBPoolStats(); ok {
+		res["db_pool"] = poolStats
+	}
+
+	return c.JSON(res)
 }

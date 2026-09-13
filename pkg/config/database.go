@@ -37,7 +37,16 @@ func ConnectDatabase() {
 		host, user, password, dbname, port, sslmode, timezone,
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	slowThreshold := 500 * time.Millisecond
+	if envThreshold := os.Getenv("SLOW_QUERY_THRESHOLD_MS"); envThreshold != "" {
+		if ms, parseErr := time.ParseDuration(envThreshold + "ms"); parseErr == nil && ms > 0 {
+			slowThreshold = ms
+		}
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: NewGormSlowQueryLogger(slowThreshold),
+	})
 	if err != nil {
 		log.Fatal("❌ Failed to connect database:", err)
 	}
@@ -160,3 +169,40 @@ func BackfillImportedBooks(db *gorm.DB) {
 	}
 	log.Printf("✅ Backfill completed: processed %d potential imported book records", count)
 }
+
+// DBPoolStats represents the runtime connection pool metrics from database/sql
+type DBPoolStats struct {
+	MaxOpenConnections int   `json:"max_open_connections"`
+	OpenConnections    int   `json:"open_connections"`
+	InUse              int   `json:"in_use"`
+	Idle               int   `json:"idle"`
+	WaitCount          int64 `json:"wait_count"`
+	WaitDurationMs     int64 `json:"wait_duration_ms"`
+	MaxIdleClosed      int64 `json:"max_idle_closed"`
+	MaxIdleTimeClosed  int64 `json:"max_idle_time_closed"`
+	MaxLifetimeClosed  int64 `json:"max_lifetime_closed"`
+}
+
+// GetDBPoolStats safely extracts in-memory sql.DB runtime stats without querying PostgreSQL
+func GetDBPoolStats() (*DBPoolStats, bool) {
+	if DB == nil {
+		return nil, false
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return nil, false
+	}
+	stats := sqlDB.Stats()
+	return &DBPoolStats{
+		MaxOpenConnections: stats.MaxOpenConnections,
+		OpenConnections:    stats.OpenConnections,
+		InUse:              stats.InUse,
+		Idle:               stats.Idle,
+		WaitCount:          stats.WaitCount,
+		WaitDurationMs:     stats.WaitDuration.Milliseconds(),
+		MaxIdleClosed:      stats.MaxIdleClosed,
+		MaxIdleTimeClosed:  stats.MaxIdleTimeClosed,
+		MaxLifetimeClosed:  stats.MaxLifetimeClosed,
+	}, true
+}
+

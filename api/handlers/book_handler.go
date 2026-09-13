@@ -328,9 +328,9 @@ func (h *BookHandler) AddPublishedBookToMyBook(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_PUBLISHED_BOOK_FAILED", nil)
 	}
 
-	// Invalidate my-items cache so the newly added items show up.
-	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":book")
-	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":all")
+	// Invalidate my-items & daily cache so the newly added items show up.
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("myitems:%s:*", userID.String()))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("daily:%s:*", userID.String()))
 	// Invalidate published books cache so total_added count is refreshed.
 	h.cache.Delete(c.Context(), "books:published")
 
@@ -1104,8 +1104,9 @@ func (h *BookHandler) RemoveFromMyBookCollection(c *fiber.Ctx) error {
 	}
 
 	// Invalidate cache
-	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":book")
-	h.cache.Delete(c.Context(), "myitems:"+userID.String()+":all")
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("myitems:%s:*", userID.String()))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("daily:%s:*", userID.String()))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("class-daily-book:%s:*", userID.String()))
 
 	return utils.Success(c, fiber.StatusOK, "book removed from collection successfully", nil, nil)
 }
