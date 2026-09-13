@@ -13,6 +13,7 @@ import (
 	_ "hifzhun-api/docs" // swagger docs
 	"hifzhun-api/pkg/cache"
 	"hifzhun-api/pkg/config"
+	"hifzhun-api/pkg/middlewares"
 	"hifzhun-api/pkg/repositories"
 	"hifzhun-api/pkg/services"
 	"hifzhun-api/pkg/usecases"
@@ -69,6 +70,8 @@ func main() {
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: true,
 	}))
+
+	app.Use(middlewares.ObservabilityMiddleware())
 
 	// Serve uploaded files
 	app.Static("/uploads", "./uploads")

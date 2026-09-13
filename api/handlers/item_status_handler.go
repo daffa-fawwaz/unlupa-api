@@ -32,6 +32,8 @@ func (h *ItemStatusHandler) invalidateItemCaches(c *fiber.Ctx, userID uuid.UUID)
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
 	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("daily:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("class-daily-book:%s:*", userID.String()))
 }
 
 // StartIntervalRequest represents start interval request

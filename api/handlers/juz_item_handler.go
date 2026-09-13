@@ -74,6 +74,8 @@ func (h *JuzItemHandler) Create(c *fiber.Ctx) error {
 	h.cache.Delete(ctx, fmt.Sprintf("juz:list:%s", userID.String()))
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s:*", userID.String()))
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("daily:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("class-daily:%s:*", userID.String()))
 
 	return utils.Success(c, fiber.StatusCreated, "Hafalan added successfully", result, nil)
 }
@@ -123,6 +125,8 @@ func (h *JuzItemHandler) Update(c *fiber.Ctx) error {
 	ctx := c.Context()
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
 	h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("daily:%s:*", userID.String()))
+	h.cache.DeleteByPattern(ctx, fmt.Sprintf("class-daily:%s:*", userID.String()))
 	return utils.Success(c, fiber.StatusOK, "Hafalan updated successfully", item, nil)
 }
 
