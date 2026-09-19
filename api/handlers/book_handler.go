@@ -27,9 +27,16 @@ import (
 // @Failure 400 {object} utils.ErrorResponse
 // @Router /books/upload-cover [post]
 func (h *BookHandler) UploadCoverImage(c *fiber.Ctx) error {
-	file, err := c.FormFile("cover")
-	if err != nil {
-		return utils.Error(c, fiber.StatusBadRequest, "cover file is required", "BAD_REQUEST", nil)
+	var file *multipart.FileHeader
+	var err error
+	for _, field := range []string{"cover", "cover_image", "image", "file"} {
+		file, err = c.FormFile(field)
+		if err == nil && file != nil {
+			break
+		}
+	}
+	if file == nil {
+		return utils.Error(c, fiber.StatusBadRequest, "cover image file is required", "BAD_REQUEST", nil)
 	}
 
 	filePath, err := utils.SaveCoverImage(file)
@@ -39,6 +46,7 @@ func (h *BookHandler) UploadCoverImage(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusOK, "cover image uploaded successfully", fiber.Map{
 		"cover_image": filePath,
+		"url":         filePath,
 	}, nil)
 }
 
@@ -1155,3 +1163,37 @@ func (h *BookHandler) RemoveMyOverride(c *fiber.Ctx) error {
 
 	return utils.Success(c, fiber.StatusOK, "override removed successfully", nil, nil)
 }
+
+// ReorderBookStructure godoc
+// @Summary Reorder modules and items in a book
+// @Description Batch update the ordering and parent relationships of modules and items in a book
+// @Tags Books
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Book ID"
+// @Param request body services.ReorderBookStructureRequest true "Reorder payload"
+// @Success 200 {object} utils.SuccessResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Router /books/{id}/reorder [patch]
+func (h *BookHandler) ReorderBookStructure(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uuid.UUID)
+	bookID := c.Params("id")
+
+	var req services.ReorderBookStructureRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, "Invalid request body", "INVALID_REQUEST_BODY", nil)
+	}
+
+	if err := h.bookSvc.ReorderBookStructure(bookID, userID, req); err != nil {
+		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "REORDER_FAILED", nil)
+	}
+
+	// Invalidate caches
+	h.cache.Delete(c.Context(), fmt.Sprintf("book:%s", bookID))
+	h.cache.Delete(c.Context(), fmt.Sprintf("book:tree:%s", bookID))
+	h.cache.DeleteByPattern(c.Context(), fmt.Sprintf("myitems:%s:*", userID.String()))
+
+	return utils.Success(c, fiber.StatusOK, "book structure reordered successfully", nil, nil)
+}
+

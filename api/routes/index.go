@@ -22,6 +22,9 @@ func SetupRoutes(
 	classHandler *handlers.ClassHandler,
 	myItemHandler *handlers.MyItemHandler,
 	classDailyHandler *handlers.ClassDailyHandler,
+	dashboardHandler *handlers.DashboardHandler,
+	quranCatalogHandler *handlers.QuranCatalogHandler,
+	quranPageHandler *handlers.QuranPageHandler,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
@@ -38,6 +41,9 @@ func SetupRoutes(
 	RegisterClassRoutes(v1, classHandler)
 	RegisterMyItemRoutes(v1, myItemHandler)
 	RegisterClassDailyRoutes(v1, classDailyHandler)
+	RegisterDashboardRoutes(v1, dashboardHandler)
+	RegisterQuranCatalogRoutes(v1, quranCatalogHandler)
+	RegisterQuranPageRoutes(v1, quranPageHandler)
 	v1.Get("/health", handlers.Health)
 }
 
