@@ -67,6 +67,9 @@ type BookService interface {
 	// Book Item Overrides
 	GetMyOverride(userID uuid.UUID, bookItemID string) (*entities.BookItemOverride, error)
 	RemoveMyOverride(userID uuid.UUID, bookItemID string) error
+
+	// Reorder
+	ReorderBookStructure(bookID string, ownerID uuid.UUID, req ReorderBookStructureRequest) error
 }
 
 // BookItemWithStability represents a BookItem with stability information
@@ -1764,3 +1767,70 @@ func (s *bookService) RemoveMyOverride(userID uuid.UUID, bookItemID string) erro
 
 	return s.overrideRepo.DeleteByUserAndBookItemID(userID, bookItemUUID)
 }
+
+type ModuleReorderInput struct {
+	ID       uuid.UUID  `json:"id"`
+	Order    int        `json:"order"`
+	ParentID *uuid.UUID `json:"parent_id"`
+}
+
+type ItemReorderInput struct {
+	ID       uuid.UUID  `json:"id"`
+	Order    int        `json:"order"`
+	ModuleID *uuid.UUID `json:"module_id"`
+}
+
+type ReorderBookStructureRequest struct {
+	Modules []ModuleReorderInput `json:"modules"`
+	Items   []ItemReorderInput   `json:"items"`
+}
+
+func (s *bookService) ReorderBookStructure(bookID string, ownerID uuid.UUID, req ReorderBookStructureRequest) error {
+	bookUUID, err := uuid.Parse(bookID)
+	if err != nil {
+		return errors.New("invalid book_id")
+	}
+
+	book, err := s.bookRepo.FindByID(bookID)
+	if err != nil {
+		return errors.New("book not found")
+	}
+
+	if book.OwnerID != ownerID {
+		return errors.New("unauthorized: you don't own this book")
+	}
+
+	tx := config.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Update modules order and parent_id
+	for _, m := range req.Modules {
+		updates := map[string]interface{}{
+			"order":     m.Order,
+			"parent_id": m.ParentID,
+		}
+		if err := tx.Model(&entities.BookModule{}).Where("id = ? AND book_id = ?", m.ID, bookUUID).Updates(updates).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// Update items order and module_id
+	for _, it := range req.Items {
+		updates := map[string]interface{}{
+			"order":     it.Order,
+			"module_id": it.ModuleID,
+		}
+		if err := tx.Model(&entities.BookItem{}).Where("id = ? AND book_id = ?", it.ID, bookUUID).Updates(updates).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
+}
+

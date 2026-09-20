@@ -82,12 +82,18 @@ func ConnectDatabase() {
 		&entities.IntervalReviewLog{},
 		&entities.BookUpdateRequest{},
 		&entities.ImportedBook{},
+		&entities.QuranPageProgress{},
+		&entities.QuranJuzCatalog{},
+		&entities.QuranPageCatalog{},
 	)
 	if err != nil {
 		log.Fatal("❌ Failed to migrate:", err)
 	}
 
 	log.Println("✅ Database connected and migrated successfully!")
+	if err := SeedQuranCatalog(db); err != nil {
+		log.Println("⚠️ Quran Catalog seeding error:", err)
+	}
 	BackfillImportedBooks(db)
 }
 

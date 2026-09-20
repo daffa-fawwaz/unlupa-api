@@ -49,6 +49,7 @@ func RegisterBookRoutes(
 	books.Put("/:id", bookHandler.UpdateBook)
 	books.Delete("/:id", bookHandler.DeleteBook)
 	books.Post("/:id/request-publish", bookHandler.RequestPublish)
+	books.Patch("/:id/reorder", bookHandler.ReorderBookStructure)
 	books.Post("/:id/modules", bookHandler.AddModule)
 	books.Post("/:id/items", bookHandler.AddItemToBook)
 

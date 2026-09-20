@@ -181,6 +181,19 @@ func main() {
 		appCache,
 	)
 
+	// ================= DASHBOARD STATS =================
+	dashboardSvc := services.NewDashboardService(config.DB, itemRepo, juzItemRepo, bookItemRepo, bookRepo)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc, appCache)
+
+	// ================= QURAN CATALOG =================
+	quranCatalogRepo := repositories.NewQuranCatalogRepository(config.DB)
+	quranCatalogSvc := services.NewQuranCatalogService(quranCatalogRepo, itemRepo, juzRepo, juzItemRepo, config.DB)
+	quranCatalogHandler := handlers.NewQuranCatalogHandler(quranCatalogSvc, appCache)
+
+	// ================= QURAN PAGES PROGRESS & REVIEW =================
+	quranPageSvc := services.NewQuranPageService(config.DB)
+	quranPageHandler := handlers.NewQuranPageHandler(quranPageSvc, appCache)
+
 	// ================= ROUTES =================
 	routes.SetupRoutes(
 		app,
@@ -198,6 +211,9 @@ func main() {
 		classHandler,
 		myItemHandler,
 		classDailyHandler,
+		dashboardHandler,
+		quranCatalogHandler,
+		quranPageHandler,
 	)
 
 	port := os.Getenv("APP_PORT")
