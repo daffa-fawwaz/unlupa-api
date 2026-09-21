@@ -44,8 +44,8 @@ type aiService struct {
 func NewAIService() AIService {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("GEMINI_MODEL")
-	if model == "" {
-		model = "gemini-2.0-flash"
+	if model == "" || model == "gemini-2.0-flash" || model == "gemini-2.5-flash" {
+		model = "gemini-3.6-flash"
 	}
 	return &aiService{
 		apiKey: apiKey,
@@ -54,6 +54,25 @@ func NewAIService() AIService {
 			Timeout: 60 * time.Second,
 		},
 	}
+}
+
+func (s *aiService) getModel() string {
+	m := os.Getenv("GEMINI_MODEL")
+	if m == "" {
+		m = s.model
+	}
+	if m == "" || m == "gemini-2.0-flash" || m == "gemini-2.5-flash" {
+		m = "gemini-3.6-flash"
+	}
+	return m
+}
+
+func (s *aiService) getApiKey() string {
+	k := os.Getenv("GEMINI_API_KEY")
+	if k == "" {
+		k = s.apiKey
+	}
+	return k
 }
 
 // Gemini REST API request / response structs
@@ -102,66 +121,87 @@ func cleanBilingualText(t string) string {
 }
 
 func (s *aiService) callGemini(ctx context.Context, prompt string, responseSchema interface{}) (string, error) {
-	if s.apiKey == "" {
+	apiKey := s.getApiKey()
+	if apiKey == "" {
 		return "", errors.New("GEMINI_API_KEY belum dikonfigurasi di server")
 	}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", s.model, s.apiKey)
+	model := s.getModel()
+	modelsToTry := []string{model}
+	if model != "gemini-3.6-flash" {
+		modelsToTry = append(modelsToTry, "gemini-3.6-flash")
+	}
 
-	reqBody := geminiRequest{
-		Contents: []geminiContent{
-			{
-				Parts: []geminiPart{
-					{Text: prompt},
+	var lastErr error
+
+	for _, currentModel := range modelsToTry {
+		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", currentModel, apiKey)
+
+		reqBody := geminiRequest{
+			Contents: []geminiContent{
+				{
+					Parts: []geminiPart{
+						{Text: prompt},
+					},
 				},
 			},
-		},
-		GenerationConfig: &geminiGenerationConfig{
-			ResponseMimeType: "application/json",
-			ResponseSchema:   responseSchema,
-		},
-	}
-
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := s.httpClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("error connecting to Gemini API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		var gErr geminiResponse
-		if json.Unmarshal(respBytes, &gErr) == nil && gErr.Error != nil {
-			return "", fmt.Errorf("Gemini API error (%d %s): %s", gErr.Error.Code, gErr.Error.Status, gErr.Error.Message)
+			GenerationConfig: &geminiGenerationConfig{
+				ResponseMimeType: "application/json",
+				ResponseSchema:   responseSchema,
+			},
 		}
-		return "", fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(respBytes))
+
+		bodyBytes, err := json.Marshal(reqBody)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal request: %w", err)
+		}
+
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return "", fmt.Errorf("failed to create request: %w", err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := s.httpClient.Do(httpReq)
+		if err != nil {
+			lastErr = fmt.Errorf("error connecting to Gemini API: %w", err)
+			continue
+		}
+
+		respBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read response: %w", err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			var gErr geminiResponse
+			if json.Unmarshal(respBytes, &gErr) == nil && gErr.Error != nil {
+				// If 404 model not found, try fallback
+				if gErr.Error.Code == 404 {
+					lastErr = fmt.Errorf("Gemini API error (%d %s): %s", gErr.Error.Code, gErr.Error.Status, gErr.Error.Message)
+					continue
+				}
+				return "", fmt.Errorf("Gemini API error (%d %s): %s", gErr.Error.Code, gErr.Error.Status, gErr.Error.Message)
+			}
+			lastErr = fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(respBytes))
+			continue
+		}
+
+		var gResp geminiResponse
+		if err := json.Unmarshal(respBytes, &gResp); err != nil {
+			return "", fmt.Errorf("failed to decode Gemini response: %w", err)
+		}
+
+		if len(gResp.Candidates) == 0 || len(gResp.Candidates[0].Content.Parts) == 0 {
+			return "", errors.New("tidak ada hasil yang dihasilkan oleh model AI")
+		}
+
+		return gResp.Candidates[0].Content.Parts[0].Text, nil
 	}
 
-	var gResp geminiResponse
-	if err := json.Unmarshal(respBytes, &gResp); err != nil {
-		return "", fmt.Errorf("failed to decode Gemini response: %w", err)
-	}
-
-	if len(gResp.Candidates) == 0 || len(gResp.Candidates[0].Content.Parts) == 0 {
-		return "", errors.New("tidak ada hasil yang dihasilkan oleh model AI")
-	}
-
-	return gResp.Candidates[0].Content.Parts[0].Text, nil
+	return "", lastErr
 }
 
 func (s *aiService) GenerateBook(ctx context.Context, topic, text, language string) (*GeneratedBook, error) {
