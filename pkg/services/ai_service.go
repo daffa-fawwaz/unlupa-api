@@ -51,7 +51,7 @@ func NewAIService() AIService {
 		apiKey: apiKey,
 		model:  model,
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: 90 * time.Second,
 		},
 	}
 }
