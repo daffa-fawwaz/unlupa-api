@@ -127,14 +127,40 @@ func (s *aiService) callGemini(ctx context.Context, prompt string, responseSchem
 	}
 
 	model := s.getModel()
-	modelsToTry := []string{model}
-	if model != "gemini-3.6-flash" {
-		modelsToTry = append(modelsToTry, "gemini-3.6-flash")
+	
+	// Chain of reliable fallback models in case of 503 (High Demand) or 404
+	candidates := []string{
+		model,
+		"gemini-flash-latest",
+		"gemini-3.6-flash",
+		"gemini-3.5-flash",
+		"gemini-3.1-flash-lite",
+	}
+
+	// Deduplicate model candidates
+	var modelsToTry []string
+	seen := make(map[string]bool)
+	for _, m := range candidates {
+		if m != "" && !seen[m] {
+			seen[m] = true
+			modelsToTry = append(modelsToTry, m)
+		}
 	}
 
 	var lastErr error
 
-	for _, currentModel := range modelsToTry {
+	for i, currentModel := range modelsToTry {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+
+		if i > 0 {
+			// Small pause before trying next fallback model
+			time.Sleep(500 * time.Millisecond)
+		}
+
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", currentModel, apiKey)
 
 		reqBody := geminiRequest{
@@ -164,38 +190,40 @@ func (s *aiService) callGemini(ctx context.Context, prompt string, responseSchem
 
 		resp, err := s.httpClient.Do(httpReq)
 		if err != nil {
-			lastErr = fmt.Errorf("error connecting to Gemini API: %w", err)
+			lastErr = fmt.Errorf("error connecting to Gemini API (%s): %w", currentModel, err)
 			continue
 		}
 
 		respBytes, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			lastErr = fmt.Errorf("failed to read response: %w", err)
+			lastErr = fmt.Errorf("failed to read response (%s): %w", currentModel, err)
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			var gErr geminiResponse
 			if json.Unmarshal(respBytes, &gErr) == nil && gErr.Error != nil {
-				// If 404 model not found, try fallback
-				if gErr.Error.Code == 404 {
-					lastErr = fmt.Errorf("Gemini API error (%d %s): %s", gErr.Error.Code, gErr.Error.Status, gErr.Error.Message)
+				// Retry / fallback on 503 (High demand), 429 (Rate limit), 404 (Model not found), or 500
+				if gErr.Error.Code == 503 || gErr.Error.Code == 429 || gErr.Error.Code == 404 || gErr.Error.Code == 500 {
+					lastErr = fmt.Errorf("Gemini API error (%d %s on %s): %s", gErr.Error.Code, gErr.Error.Status, currentModel, gErr.Error.Message)
 					continue
 				}
 				return "", fmt.Errorf("Gemini API error (%d %s): %s", gErr.Error.Code, gErr.Error.Status, gErr.Error.Message)
 			}
-			lastErr = fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(respBytes))
+			lastErr = fmt.Errorf("Gemini API returned status %d on %s: %s", resp.StatusCode, currentModel, string(respBytes))
 			continue
 		}
 
 		var gResp geminiResponse
 		if err := json.Unmarshal(respBytes, &gResp); err != nil {
-			return "", fmt.Errorf("failed to decode Gemini response: %w", err)
+			lastErr = fmt.Errorf("failed to decode Gemini response (%s): %w", currentModel, err)
+			continue
 		}
 
 		if len(gResp.Candidates) == 0 || len(gResp.Candidates[0].Content.Parts) == 0 {
-			return "", errors.New("tidak ada hasil yang dihasilkan oleh model AI")
+			lastErr = fmt.Errorf("model %s tidak menghasilkan output teks", currentModel)
+			continue
 		}
 
 		return gResp.Candidates[0].Content.Parts[0].Text, nil
