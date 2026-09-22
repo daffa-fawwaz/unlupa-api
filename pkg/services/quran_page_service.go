@@ -161,8 +161,12 @@ func (s *QuranPageService) ReviewPage(
 	if pageNumber < 1 || pageNumber > 604 {
 		return nil, errors.New("nomor halaman harus antara 1 dan 604")
 	}
-	if rating < fsrs.Again || rating > fsrs.Easy {
-		return nil, errors.New("rating tidak valid (1-4)")
+	if rating < fsrs.Again || rating > fsrs.Good {
+		if rating == fsrs.Easy {
+			rating = fsrs.Good
+		} else {
+			return nil, errors.New("rating tidak valid (1-3)")
+		}
 	}
 
 	var progress entities.QuranPageProgress
@@ -197,6 +201,11 @@ func (s *QuranPageService) ReviewPage(
 		progress.Difficulty = 5.0
 	}
 
+	// Enforce rule: Rating 3 (Good/Mutqin) is ONLY accessible if stability > 30.0 days
+	if rating == fsrs.Good && progress.Stability <= 30.0 && progress.Status != entities.QuranPageStatusMapan {
+		rating = fsrs.Hard // clamp to rating 2 if stability <= 30
+	}
+
 	var lastReview time.Time
 	if progress.LastReviewedAt != nil {
 		lastReview = *progress.LastReviewedAt
@@ -209,7 +218,8 @@ func (s *QuranPageService) ReviewPage(
 	}
 
 	weights := fsrs.DefaultWeights()
-	result := fsrs.Review(prevState, rating, now, weights)
+	// Target Retensi Al-Qur'an = 95% (0.95)
+	result := fsrs.ReviewWithRetention(prevState, rating, now, weights, fsrs.QuranRetention)
 
 	progress.Stability = result.NewState.Stability
 	progress.Difficulty = result.NewState.Difficulty

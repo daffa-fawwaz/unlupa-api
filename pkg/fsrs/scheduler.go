@@ -6,6 +6,7 @@ import (
 )
 
 const DefaultRetention = 0.9
+const QuranRetention = 0.95
 const goodGainDamping = 0.8 // reduce stability jump for rating=Good (3)
 
 type ReviewResult struct {
@@ -19,6 +20,19 @@ func Review(
 	now time.Time,
 	w Weights,
 ) ReviewResult {
+	return ReviewWithRetention(state, rating, now, w, DefaultRetention)
+}
+
+func ReviewWithRetention(
+	state CardState,
+	rating Rating,
+	now time.Time,
+	w Weights,
+	retention float64,
+) ReviewResult {
+	if retention <= 0 || retention >= 1.0 {
+		retention = DefaultRetention
+	}
 
 	elapsed := now.Sub(state.LastReview).Hours() / 24
 	if elapsed < 0 {
@@ -65,7 +79,7 @@ func Review(
 		Snew = 0.01
 	}
 
-	intervalDays := NextInterval(Snew, DefaultRetention)
+	intervalDays := NextInterval(Snew, retention)
 	if intervalDays < 1 {
 		intervalDays = 1
 	}

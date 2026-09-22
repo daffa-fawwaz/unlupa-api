@@ -206,8 +206,15 @@ func (s *ItemReviewService) ReviewItem(
 		LastReview: lastReview,
 	}
 
-	// 10. Run FSRS review
-	result := fsrs.Review(prevState, rating, now, weights)
+	// 10. Run FSRS review with appropriate retention
+	retention := fsrs.DefaultRetention
+	if item.SourceType == "quran" {
+		retention = fsrs.QuranRetention
+		if rating == fsrs.Good && item.Stability <= 30.0 && item.Status != entities.ItemStatusGraduate {
+			rating = fsrs.Hard
+		}
+	}
+	result := fsrs.ReviewWithRetention(prevState, rating, now, weights, retention)
 
 	// 11. Update item with new FSRS state
 	item.Stability = result.NewState.Stability
