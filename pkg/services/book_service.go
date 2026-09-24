@@ -805,17 +805,18 @@ func (s *bookService) RequestPublish(bookID string, ownerID uuid.UUID, isEditabl
 		return errors.New("you don't have permission to publish this book")
 	}
 
-	if book.Status != entities.BookStatusDraft && book.Status != entities.BookStatusRejected {
-		return errors.New("book must be in draft or rejected status to request publish")
+	if book.Status == entities.BookStatusPublished {
+		return errors.New("book is already published")
 	}
 
-	// Save the editable flag before changing status
+	// Save the editable flag before publishing
 	book.IsEditable = isEditable
 	if err := s.bookRepo.Update(book); err != nil {
 		return err
 	}
 
-	return s.bookRepo.UpdateStatus(bookID, entities.BookStatusPending)
+	// Directly publish book without requiring admin pre-approval
+	return s.bookRepo.UpdateStatus(bookID, entities.BookStatusPublished)
 }
 
 func (s *bookService) GetPendingBooks() ([]entities.Book, error) {

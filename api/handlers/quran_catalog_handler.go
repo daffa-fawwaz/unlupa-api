@@ -53,7 +53,15 @@ func (h *QuranCatalogHandler) GetJuzs(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", nil)
 	}
 
-	result, err := h.service.GetAllJuzs(c.Context(), userID)
+	targetUserID := userID
+	queryUserID := c.Query("user_id")
+	if queryUserID != "" {
+		if parsedUID, err := uuid.Parse(queryUserID); err == nil {
+			targetUserID = parsedUID
+		}
+	}
+
+	result, err := h.service.GetAllJuzs(c.Context(), targetUserID)
 	if err != nil {
 		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_JUZS_FAILED", nil)
 	}
@@ -84,7 +92,15 @@ func (h *QuranCatalogHandler) GetJuzPages(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusBadRequest, "Nomor Juz tidak valid (harus 1-30)", "INVALID_PARAMETER", nil)
 	}
 
-	result, err := h.service.GetJuzPages(c.Context(), juzNumber, userID)
+	targetUserID := userID
+	queryUserID := c.Query("user_id")
+	if queryUserID != "" {
+		if parsedUID, err := uuid.Parse(queryUserID); err == nil {
+			targetUserID = parsedUID
+		}
+	}
+
+	result, err := h.service.GetJuzPages(c.Context(), juzNumber, targetUserID)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "GET_JUZ_PAGES_FAILED", nil)
 	}

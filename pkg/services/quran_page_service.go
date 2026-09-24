@@ -16,15 +16,16 @@ import (
 )
 
 type QuranPageSummary struct {
-	PageNumber     int        `json:"page_number"`
-	JuzNumber      int        `json:"juz_number"`
-	Status         string     `json:"status"` // new | learning | review | mapan
-	Stability      float64    `json:"stability"`
-	Difficulty     float64    `json:"difficulty"`
-	LastReviewedAt *time.Time `json:"last_reviewed_at,omitempty"`
-	NextReviewAt   *time.Time `json:"next_review_at,omitempty"`
-	ReviewCount    int        `json:"review_count"`
-	IsDue          bool       `json:"is_due"`
+	PageNumber      int        `json:"page_number"`
+	JuzNumber       int        `json:"juz_number"`
+	Status          string     `json:"status"` // new | learning | review | mapan
+	Stability       float64    `json:"stability"`
+	Difficulty      float64    `json:"difficulty"`
+	LastReviewedAt  *time.Time `json:"last_reviewed_at,omitempty"`
+	NextReviewAt    *time.Time `json:"next_review_at,omitempty"`
+	ReviewCount     int        `json:"review_count"`
+	IsDue           bool       `json:"is_due"`
+	HasReachedMapan bool       `json:"has_reached_mapan"`
 }
 
 type QuranPagesStats struct {
@@ -120,16 +121,19 @@ func (s *QuranPageService) GetAllPagesProgress(ctx context.Context, userID uuid.
 				diff = 5.0
 			}
 
+			hasMapan := record.HasReachedMapan || record.Status == entities.QuranPageStatusMapan || stab >= 30.0
+
 			pages[p-1] = QuranPageSummary{
-				PageNumber:     p,
-				JuzNumber:      juz,
-				Status:         record.Status,
-				Stability:      math.Round(stab*100) / 100,
-				Difficulty:     math.Round(diff*100) / 100,
-				LastReviewedAt: record.LastReviewedAt,
-				NextReviewAt:   record.NextReviewAt,
-				ReviewCount:    record.ReviewCount,
-				IsDue:          isDue,
+				PageNumber:      p,
+				JuzNumber:       juz,
+				Status:          record.Status,
+				Stability:       math.Round(stab*100) / 100,
+				Difficulty:      math.Round(diff*100) / 100,
+				LastReviewedAt:  record.LastReviewedAt,
+				NextReviewAt:    record.NextReviewAt,
+				ReviewCount:     record.ReviewCount,
+				IsDue:           isDue,
+				HasReachedMapan: hasMapan,
 			}
 
 			switch record.Status {
@@ -145,12 +149,15 @@ func (s *QuranPageService) GetAllPagesProgress(ctx context.Context, userID uuid.
 		}
 	}
 
-	stats.MapanPercent = math.Round((float64(stats.MapanPages)/604.0)*1000) / 10.0
+	totalActive := stats.MapanPages + stats.ReviewPages + stats.LearningPages
+	if totalActive > 0 {
+		stats.MapanPercent = math.Round((float64(stats.MapanPages)/float64(totalActive))*1000) / 10
+	}
 
 	return pages, stats, nil
 }
 
-// ReviewPage records an FSRS review for a specific Mushaf page
+// ReviewPage records a review outcome (Again=1, Hard=2, Good=3, Easy=4) for a Quran page
 func (s *QuranPageService) ReviewPage(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -159,14 +166,7 @@ func (s *QuranPageService) ReviewPage(
 	now time.Time,
 ) (*entities.QuranPageProgress, error) {
 	if pageNumber < 1 || pageNumber > 604 {
-		return nil, errors.New("nomor halaman harus antara 1 dan 604")
-	}
-	if rating < fsrs.Again || rating > fsrs.Good {
-		if rating == fsrs.Easy {
-			rating = fsrs.Good
-		} else {
-			return nil, errors.New("rating tidak valid (1-3)")
-		}
+		return nil, errors.New("invalid page number, must be between 1 and 604")
 	}
 
 	var progress entities.QuranPageProgress
@@ -201,9 +201,10 @@ func (s *QuranPageService) ReviewPage(
 		progress.Difficulty = 5.0
 	}
 
-	// Enforce rule: Rating 3 (Good/Mutqin) is ONLY accessible if stability > 30.0 days
-	if rating == fsrs.Good && progress.Stability <= 30.0 && progress.Status != entities.QuranPageStatusMapan {
-		rating = fsrs.Hard // clamp to rating 2 if stability <= 30
+	// Enforce rule: Rating 3 (Good/Mutqin) is accessible if stability > 30.0 OR has ever reached >= 30.0 days
+	hasEverReached30 := progress.HasReachedMapan || progress.Stability >= 30.0 || progress.Status == entities.QuranPageStatusMapan
+	if rating == fsrs.Good && !hasEverReached30 {
+		rating = fsrs.Hard // clamp to rating 2 if never reached stability > 30
 	}
 
 	var lastReview time.Time
@@ -237,9 +238,17 @@ func (s *QuranPageService) ReviewPage(
 	nextReview = time.Date(nextReview.Year(), nextReview.Month(), nextReview.Day(), 0, 0, 0, 0, nextReview.Location())
 	progress.NextReviewAt = &nextReview
 
-	// Status transition
+	// Status transition & mapan tracking
 	if progress.Stability >= 30.0 {
+		progress.HasReachedMapan = true
 		progress.Status = entities.QuranPageStatusMapan
+	} else if progress.HasReachedMapan || hasEverReached30 {
+		progress.HasReachedMapan = true
+		if rating == fsrs.Again {
+			progress.Status = entities.QuranPageStatusLearning
+		} else {
+			progress.Status = entities.QuranPageStatusReview
+		}
 	} else if rating == fsrs.Again {
 		progress.Status = entities.QuranPageStatusLearning
 	} else {
@@ -250,7 +259,7 @@ func (s *QuranPageService) ReviewPage(
 	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "user_id"}, {Name: "page_number"}},
 		DoUpdates: clause.AssignmentColumns([]string{
-			"status", "stability", "difficulty", "last_reviewed_at", "next_review_at", "review_count", "updated_at",
+			"status", "stability", "difficulty", "last_reviewed_at", "next_review_at", "review_count", "has_reached_mapan", "updated_at",
 		}),
 	}).Save(&progress).Error; err != nil {
 		return nil, err
@@ -264,7 +273,7 @@ func (s *QuranPageService) ReviewPage(
 	}
 
 	itemStatus := entities.ItemStatusFSRSActive
-	if progress.Stability >= 30.0 || intervalDays >= 30 {
+	if progress.Stability >= 30.0 || intervalDays >= 30 || progress.HasReachedMapan {
 		itemStatus = entities.ItemStatusGraduate
 	}
 
@@ -279,48 +288,33 @@ func (s *QuranPageService) ReviewPage(
 		existingItem.NextReviewAt = progress.NextReviewAt
 		existingItem.IntervalDays = intervalDays
 		_ = s.db.WithContext(ctx).Save(&existingItem).Error
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		juzNum := entities.GetJuzForPage(pageNumber)
-		var personalJuz entities.Juz
-		_ = s.db.WithContext(ctx).Where("user_id = ? AND index = ? AND class_id IS NULL", userID, juzNum).First(&personalJuz).Error
-		if personalJuz.ID == uuid.Nil {
-			personalJuz = entities.Juz{
-				UserID:   userID,
-				Index:    juzNum,
-				IsActive: true,
-			}
-			_ = s.db.WithContext(ctx).Create(&personalJuz).Error
+	}
+
+	if existingItem.ID != uuid.Nil {
+		reviewLog := entities.ReviewLog{
+			ID:               uuid.New(),
+			UserID:           userID,
+			ItemID:           existingItem.ID,
+			Rating:           int(rating),
+			StabilityBefore:  prevState.Stability,
+			DifficultyBefore: prevState.Difficulty,
+			StabilityAfter:   progress.Stability,
+			DifficultyAfter:  progress.Difficulty,
+			IntervalDays:     intervalDays,
+			ReviewedAt:       now,
+			CreatedAt:        now,
 		}
-		newItem := entities.Item{
-			OwnerID:      userID,
-			SourceType:   "quran",
-			ContentRef:   contentRef,
-			Status:       itemStatus,
-			Stability:    progress.Stability,
-			Difficulty:   progress.Difficulty,
-			ReviewCount:  progress.ReviewCount,
-			LastReviewAt: progress.LastReviewedAt,
-			NextReviewAt: progress.NextReviewAt,
-			IntervalDays: intervalDays,
-		}
-		if err := s.db.WithContext(ctx).Create(&newItem).Error; err == nil && personalJuz.ID != uuid.Nil {
-			juzItem := entities.JuzItem{
-				ID:     uuid.New(),
-				JuzID:  personalJuz.ID,
-				ItemID: newItem.ID,
-			}
-			_ = s.db.WithContext(ctx).Create(&juzItem).Error
-		}
+		_ = s.db.WithContext(ctx).Create(&reviewLog).Error
 	}
 
 	return &progress, nil
 }
 
-// GetJuz30Progress returns detailed page and surah metrics for Juz 30 (pages 582-604)
+// GetJuz30Progress returns progress for Juz 30 pages (582-604) and surah breakdowns
 func (s *QuranPageService) GetJuz30Progress(ctx context.Context, userID uuid.UUID) (*Juz30ProgressResponse, error) {
 	var records []entities.QuranPageProgress
 	if err := s.db.WithContext(ctx).
-		Where("user_id = ? AND juz_number = 30", userID).
+		Where("user_id = ? AND page_number >= 582 AND page_number <= 604", userID).
 		Find(&records).Error; err != nil {
 		return nil, err
 	}
@@ -354,16 +348,18 @@ func (s *QuranPageService) GetJuz30Progress(ctx context.Context, userID uuid.UUI
 			if record.Status == entities.QuranPageStatusMapan {
 				mapanCount++
 			}
+			hasMapan := record.HasReachedMapan || record.Status == entities.QuranPageStatusMapan || record.Stability >= 30.0
 			pages = append(pages, QuranPageSummary{
-				PageNumber:     p,
-				JuzNumber:      30,
-				Status:         record.Status,
-				Stability:      record.Stability,
-				Difficulty:     record.Difficulty,
-				LastReviewedAt: record.LastReviewedAt,
-				NextReviewAt:   record.NextReviewAt,
-				ReviewCount:    record.ReviewCount,
-				IsDue:          isDue,
+				PageNumber:      p,
+				JuzNumber:       30,
+				Status:          record.Status,
+				Stability:       record.Stability,
+				Difficulty:      record.Difficulty,
+				LastReviewedAt:  record.LastReviewedAt,
+				NextReviewAt:    record.NextReviewAt,
+				ReviewCount:     record.ReviewCount,
+				IsDue:           isDue,
+				HasReachedMapan: hasMapan,
 			})
 		}
 	}

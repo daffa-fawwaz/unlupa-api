@@ -44,7 +44,15 @@ func (h *QuranPageHandler) GetPages(c *fiber.Ctx) error {
 		return fiber.ErrUnauthorized
 	}
 
-	pages, stats, err := h.service.GetAllPagesProgress(c.Context(), userID)
+	targetUserID := userID
+	queryUserID := c.Query("user_id")
+	if queryUserID != "" {
+		if parsedUID, err := uuid.Parse(queryUserID); err == nil {
+			targetUserID = parsedUID
+		}
+	}
+
+	pages, stats, err := h.service.GetAllPagesProgress(c.Context(), targetUserID)
 	if err != nil {
 		return utils.Error(c, fiber.StatusInternalServerError, err.Error(), "GET_PAGES_FAILED", nil)
 	}
@@ -99,7 +107,11 @@ func (h *QuranPageHandler) ReviewPage(c *fiber.Ctx) error {
 	if h.cache != nil {
 		ctx := c.Context()
 		h.cache.Delete(ctx, fmt.Sprintf("unlupa:dashboard:stats:%s", userID.String()))
-		h.cache.DeleteByPattern(ctx, fmt.Sprintf("quran:pages:%s:*", userID.String()))
+		h.cache.DeleteByPattern(ctx, fmt.Sprintf("quran:pages:%s*", userID.String()))
+		h.cache.DeleteByPattern(ctx, fmt.Sprintf("quran:juzs:%s*", userID.String()))
+		h.cache.DeleteByPattern(ctx, fmt.Sprintf("juz:list:%s*", userID.String()))
+		h.cache.DeleteByPattern(ctx, fmt.Sprintf("daily:%s*", userID.String()))
+		h.cache.DeleteByPattern(ctx, fmt.Sprintf("myitems:%s:*", userID.String()))
 	}
 
 	msg := fmt.Sprintf("Halaman %d berhasil dimurajaah", req.PageNumber)

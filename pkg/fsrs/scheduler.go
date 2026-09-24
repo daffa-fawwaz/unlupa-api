@@ -34,55 +34,36 @@ func ReviewWithRetention(
 		retention = DefaultRetention
 	}
 
-	elapsed := now.Sub(state.LastReview).Hours() / 24
-	if elapsed < 0 {
-		elapsed = 0
-	}
+	var Snew, Dnew float64
 
-	R := Retrievability(elapsed, state.Stability)
-	Dnew := UpdateDifficulty(state.Difficulty, rating, w)
-	if math.IsNaN(Dnew) || math.IsInf(Dnew, 0) || Dnew <= 0 {
-		Dnew = w.W[1] // initial difficulty default
-	}
-
-	var Snew float64
-
-	if rating == Again {
-		// ✅ FSRS PURE V6 — LAPSE
-		Snew = w.W[3] * math.Pow(state.Stability, w.W[4])
+	if state.Stability <= 0 || state.LastReview.IsZero() {
+		Snew = InitStability(rating, w)
+		Dnew = InitDifficulty(rating, w)
 	} else {
-		// ✅ FSRS PURE V6 — RECALL
-		Snew = state.Stability * (1 +
-			math.Exp(w.W[5])*
-				(11-state.Difficulty)*
-				math.Pow(state.Stability, -w.W[6])*
-				(math.Exp((1-R)*w.W[7])-1))
-
-		if rating == Hard {
-			Snew *= w.W[8]
+		elapsed := now.Sub(state.LastReview).Hours() / 24.0
+		if elapsed < 0 {
+			elapsed = 0
 		}
-		if rating == Easy {
-			Snew *= w.W[9]
+		R := Retrievability(elapsed, state.Stability, w)
+		if rating == Again {
+			Snew = NextStabilityFail(state.Stability, state.Difficulty, R, w)
+		} else {
+			Snew = NextStabilitySuccess(state.Stability, state.Difficulty, R, rating, w)
 		}
-		// Dampen growth specifically for Good to avoid too large jumps
-		if rating == Good {
-			// move partially towards computed Snew
-			Snew = state.Stability + (Snew-state.Stability)*goodGainDamping
-		}
+		Dnew = NextDifficulty(state.Difficulty, rating, w)
 	}
 
-	// Protect JSON encoding + downstream logic from NaN/Inf.
-	if math.IsNaN(Snew) || math.IsInf(Snew, 0) {
+	if math.IsNaN(Snew) || math.IsInf(Snew, 0) || Snew < 0.01 {
 		Snew = 0.01
 	}
-	if Snew < 0.01 {
-		Snew = 0.01
+	if math.IsNaN(Dnew) || math.IsInf(Dnew, 0) || Dnew < 1.0 {
+		Dnew = 1.0
+	}
+	if Dnew > 10.0 {
+		Dnew = 10.0
 	}
 
-	intervalDays := NextInterval(Snew, retention)
-	if intervalDays < 1 {
-		intervalDays = 1
-	}
+	intervalDays := IntervalFromStability(Snew, retention, w)
 
 	return ReviewResult{
 		NewState: CardState{
@@ -90,6 +71,6 @@ func ReviewWithRetention(
 			Difficulty: Dnew,
 			LastReview: now,
 		},
-		Interval: time.Duration(intervalDays * 24 * float64(time.Hour)),
+		Interval: time.Duration(intervalDays) * 24 * time.Hour,
 	}
 }

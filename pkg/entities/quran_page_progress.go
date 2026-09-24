@@ -27,6 +27,7 @@ type QuranPageProgress struct {
 	LastReviewedAt *time.Time `gorm:"type:timestamp" json:"last_reviewed_at,omitempty"`
 	NextReviewAt *time.Time `gorm:"type:timestamp;index" json:"next_review_at,omitempty"`
 	ReviewCount  int        `gorm:"default:0" json:"review_count"`
+	HasReachedMapan bool    `gorm:"default:false" json:"has_reached_mapan"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
