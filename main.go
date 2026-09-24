@@ -194,6 +194,10 @@ func main() {
 	quranPageSvc := services.NewQuranPageService(config.DB)
 	quranPageHandler := handlers.NewQuranPageHandler(quranPageSvc, appCache)
 
+	// ================= AI BUILDER (GEMINI) =================
+	aiSvc := services.NewAIService()
+	aiHandler := handlers.NewAIHandler(aiSvc)
+
 	// ================= ROUTES =================
 	routes.SetupRoutes(
 		app,
@@ -214,6 +218,7 @@ func main() {
 		dashboardHandler,
 		quranCatalogHandler,
 		quranPageHandler,
+		aiHandler,
 	)
 
 	port := os.Getenv("APP_PORT")

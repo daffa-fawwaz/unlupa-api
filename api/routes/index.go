@@ -25,6 +25,7 @@ func SetupRoutes(
 	dashboardHandler *handlers.DashboardHandler,
 	quranCatalogHandler *handlers.QuranCatalogHandler,
 	quranPageHandler *handlers.QuranPageHandler,
+	aiHandler *handlers.AIHandler,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
@@ -44,6 +45,7 @@ func SetupRoutes(
 	RegisterDashboardRoutes(v1, dashboardHandler)
 	RegisterQuranCatalogRoutes(v1, quranCatalogHandler)
 	RegisterQuranPageRoutes(v1, quranPageHandler)
+	RegisterAIRoutes(v1, aiHandler)
 	v1.Get("/health", handlers.Health)
 }
 

@@ -107,8 +107,9 @@ func (r *quranCatalogRepository) FindAllJuzWithUserStats(ctx context.Context, us
 			COUNT(DISTINCT i.id) AS active_pages,
 			COUNT(DISTINCT CASE WHEN i.status = 'graduate' THEN i.id END) AS mastered_pages,
 			COUNT(DISTINCT CASE 
-				WHEN i.status = 'fsrs_active' AND i.next_review_at IS NOT NULL AND i.next_review_at <= ? THEN i.id
-				WHEN i.status = 'interval' AND i.interval_next_review_at IS NOT NULL AND i.interval_next_review_at <= ? THEN i.id
+				WHEN i.status IN ('start', 'menghafal') THEN i.id
+				WHEN i.status = 'fsrs_active' AND (i.next_review_at IS NULL OR i.next_review_at <= ?) THEN i.id
+				WHEN i.status = 'interval' AND (i.interval_next_review_at IS NULL OR i.interval_next_review_at <= ?) THEN i.id
 				ELSE NULL
 			END) AS due_today
 		FROM quran_juz_catalogs j
@@ -236,12 +237,18 @@ func (r *quranCatalogRepository) FindJuzPagesWithUserStatus(ctx context.Context,
 
 			if reviewStatus == entities.ItemStatusInterval {
 				nextReview = row.IntervalNextReviewAt
+				if nextReview == nil || !nextReview.After(endOfDay) {
+					isDue = true
+				}
+			} else if reviewStatus == entities.ItemStatusGraduate {
+				nextReview = row.IntervalNextReviewAt
 				if nextReview != nil && !nextReview.After(endOfDay) {
 					isDue = true
 				}
 			} else {
+				// start, menghafal, fsrs_active
 				nextReview = row.NextReviewAt
-				if nextReview != nil && !nextReview.After(endOfDay) {
+				if nextReview == nil || !nextReview.After(endOfDay) {
 					isDue = true
 				}
 			}

@@ -1,144 +1,132 @@
-# Hifzhun API
+# Unlupa API (Hifzhun Backend)
 
-REST API untuk aplikasi Hifzhun menggunakan Go, Fiber, dan PostgreSQL.
+REST API backend untuk platform **Unlupa (Hifzhun)** menggunakan Go (Golang), Fiber v2, GORM, PostgreSQL, dan Redis.
 
-## Tech Stack
+---
 
-- Go 1.24+
-- Fiber v2 (Web Framework)
-- GORM (ORM)
-- PostgreSQL
-- JWT Authentication
-- bcrypt (Password Hashing)
+## 🛠 Tech Stack
 
-## Struktur Project
+- **Language**: Go 1.24+
+- **Web Framework**: Fiber v2 (`github.com/gofiber/fiber/v2`)
+- **Database & ORM**: PostgreSQL, GORM (`gorm.io/gorm`)
+- **Caching**: Redis
+- **Auth**: JWT (JSON Web Token), bcrypt
+- **Algorithm Engine**: Free Spaced Repetition Scheduler (FSRS)
+- **Object Storage**: Supabase Storage (S3-compatible)
+
+---
+
+## 📂 Struktur Direktori
 
 ```
-hifzhun-api/
+unlupa-api/
 ├── api/
-│   ├── handlers/    # HTTP handlers
-│   └── routes/      # Route definitions
+│   ├── handlers/       # Controller / HTTP Route Handlers
+│   ├── middlewares/    # Auth, Logger, CORS, Rate Limit
+│   └── routes/         # Router Group Registrations
 ├── pkg/
-│   ├── config/      # Database config
-│   ├── entities/    # GORM models
-│   ├── repositories/# Data access layer
-│   ├── services/    # Business services
-│   ├── usecases/    # Business logic
-│   └── utils/       # Helper functions
-├── main.go
-└── go.mod
+│   ├── config/         # Konfigurasi Database, Redis, App
+│   ├── entities/       # GORM Model Database Entities
+│   ├── fsrs/           # FSRS Algorithm Implementation
+│   ├── repositories/   # Database Query & Persistence Layer
+│   ├── services/       # Business Logic Layer
+│   └── utils/          # Standard Response, Hashing, Validation
+├── docs/               # Swagger / OpenAPI Documentation
+├── uploads/            # Temporary File Uploads
+├── main.go             # Application Entry Point
+└── go.mod              # Go Module Definitions
 ```
 
-## Setup
+---
 
-### 1. Clone repository
+## 🚀 Cara Menjalankan
 
-```bash
-git clone <repository-url>
-cd hifzhun-api
-```
+### 1. Prasyarat
+- Go 1.24 atau lebih baru terpasang di sistem.
+- PostgreSQL & Redis telah berjalan.
 
-### 2. Buat file `.env`
+### 2. Konfigurasi Environment (`.env`)
+Salin atau buat file `.env` di folder root `unlupa-api/`:
 
 ```env
-# App
+# Application
 APP_PORT=3000
+APP_MODE=dev
 
-# Database
-DB_HOST=localhost
+# PostgreSQL Database
+DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=your_password
-DB_NAME=hifzhun
+DB_NAME=hifzhun_db
 DB_SSLMODE=disable
 DB_TIMEZONE=Asia/Jakarta
 
-# JWT
-JWT_SECRET=your-secret-key
+# JWT Security
+JWT_SECRET=your_secret_key_here
+JWT_EXPIRE_HOURS=24
+
+# Redis Cache
+REDIS_URL=localhost:6379
+
+# Supabase Storage (Opsional)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_BUCKET=unlupa-storage
 ```
 
-### 3. Install dependencies
-
+### 3. Install Dependensi
 ```bash
 go mod download
 ```
 
-### 4. Jalankan server
-
+### 4. Jalankan Server
 ```bash
 go run main.go
 ```
+Server akan aktif di: `http://localhost:3000`
 
-Server akan berjalan di `http://localhost:3000`
+---
 
-## API Endpoints
+## 📡 Ringkasan API Endpoints
 
 Base URL: `/api/v1`
 
-### Auth
-
+### 1. Autentikasi (`/auth`)
 | Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| POST | `/auth/register` | Register user baru |
-| POST | `/auth/login` | Login user |
-| PUT | `/auth/admin/approve/:id` | Approve teacher (admin only) |
+|---|---|---|
+| `POST` | `/auth/register` | Mendaftarkan akun pengguna baru (`student` / `teacher`) |
+| `POST` | `/auth/login` | Masuk dan mendapatkan JWT Token |
+| `GET` | `/auth/me` | Mendapatkan data profil pengguna saat ini |
+| `PUT` | `/auth/admin/approve/:id` | Menyetujui akun guru (Khusus Admin) |
 
-### Register
+### 2. Katalog & Halaman Al-Qur'an (`/quran`)
+| Method | Endpoint | Deskripsi |
+|---|---|---|
+| `GET` | `/quran/juzs?user_id=` | Mengambil 30 Juz beserta rekap status aktif, mapan, dan due today |
+| `GET` | `/quran/juzs/:juzNumber/pages?user_id=` | Mengambil detail halaman Mushaf Madani per Juz |
+| `POST` | `/quran/pages/:mushafPage/activate` | Mengaktifkan halaman Al-Qur'an untuk mulai dihafal |
+| `POST` | `/quran/pages/review` | Mengirimkan penilaian murajaah FSRS (Rating 1-4) |
+| `GET` | `/quran/pages?user_id=` | Rekap kemajuan seluruh 604 halaman Mushaf |
+| `GET` | `/quran/juz30` | Checklist khusus progres Juz 30 (Surah 78-114) |
 
+### 3. Ruang Kelas (`/classes`)
+| Method | Endpoint | Deskripsi |
+|---|---|---|
+| `GET` | `/classes` | Mengambil daftar kelas yang dikelola pengajar |
+| `GET` | `/classes/joined` | Mengambil daftar kelas yang diikuti santri |
+| `POST` | `/classes` | Membuat ruang kelas baru |
+| `POST` | `/classes/join` | Bergabung ke kelas menggunakan kode kelas (6 karakter) |
+| `GET` | `/classes/:id/members` | Mengambil daftar santri dalam kelas beserta progres |
+| `POST` | `/classes/:id/leave` | Santri keluar dari kelas (*Leave Class*) |
+| `PUT` | `/classes/:id` | Memperbarui nama, deskripsi, atau cover kelas |
+| `DELETE` | `/classes/:id` | Menghapus kelas (Hanya Guru Pemilik) |
+
+---
+
+## 🧪 Testing
+
+Jalankan test suite menggunakan:
 ```bash
-curl -X POST http://localhost:3000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john",
-    "email": "john@example.com",
-    "password": "password123",
-    "role": "student",
-    "full_name": "John Doe"
-  }'
+go test ./...
 ```
-
-**Role yang tersedia:**
-- `student` - langsung aktif
-- `teacher` - perlu approval admin
-
-### Login
-
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "john@example.com",
-    "password": "password123"
-  }'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "login success",
-  "data": {
-    "id": "uuid",
-    "email": "john@example.com",
-    "role": "student",
-    "token": "eyJhbGciOiJIUzI1NiIs..."
-  }
-}
-```
-
-### Approve Teacher (Admin)
-
-```bash
-curl -X PUT http://localhost:3000/api/v1/auth/admin/approve/{user_id}
-```
-
-## Database
-
-Project menggunakan GORM AutoMigrate. Tabel akan dibuat otomatis saat server dijalankan:
-
-- `users`
-- `kitabs`
-- `classes`
-- `class_members`
-- `cards`
-- `card_states`

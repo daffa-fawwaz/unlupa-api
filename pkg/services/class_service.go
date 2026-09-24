@@ -330,10 +330,14 @@ func NewClassService(
 	}
 }
 
-// generateClassCode generates a unique 6-character alphanumeric code
-func (s *classService) generateClassCode() (string, error) {
+// generateClassCode generates a unique code with prefix based on class type (QRN-**** or BOOK-****)
+func (s *classService) generateClassCode(classType string) (string, error) {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const codeLength = 6
+	prefix := "BOOK-"
+	if strings.ToLower(classType) == entities.ClassTypeQuran {
+		prefix = "QRN-"
+	}
+	const codeLength = 4
 
 	for attempts := 0; attempts < 10; attempts++ {
 		code := make([]byte, codeLength)
@@ -345,7 +349,7 @@ func (s *classService) generateClassCode() (string, error) {
 			code[i] = charset[num.Int64()]
 		}
 
-		codeStr := string(code)
+		codeStr := prefix + string(code)
 		exists, err := s.classRepo.IsCodeExists(codeStr)
 		if err != nil {
 			return "", err
@@ -369,7 +373,7 @@ func (s *classService) CreateClass(teacherID uuid.UUID, name, description, class
 		return nil, errors.New("invalid class type, must be 'quran' or 'book'")
 	}
 
-	classCode, err := s.generateClassCode()
+	classCode, err := s.generateClassCode(classType)
 	if err != nil {
 		return nil, err
 	}
