@@ -787,6 +787,7 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 	title := c.FormValue("title")
 	content := c.FormValue("content")
 	answer := c.FormValue("answer")
+	explanation := c.FormValue("explanation")
 	order := 0
 	estimateValue := 0
 	estimateUnit := c.FormValue("estimate_unit")
@@ -808,7 +809,7 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(bookID, nil, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL)
+	item, err := h.bookSvc.AddItem(bookID, nil, userID, title, content, answer, explanation, order, estimateValue, estimateUnit, imageURL)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -828,6 +829,7 @@ func (h *BookHandler) AddItemToBook(c *fiber.Ctx) error {
 // @Param title formData string false "Item title"
 // @Param content formData string true "Item content"
 // @Param answer formData string true "Item answer"
+// @Param explanation formData string false "Item explanation (optional)"
 // @Param order formData int false "Item order"
 // @Param estimate_value formData int false "Estimate value"
 // @Param estimate_unit formData string false "Estimate unit (seconds or minutes)"
@@ -848,6 +850,7 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 	title := c.FormValue("title")
 	content := c.FormValue("content")
 	answer := c.FormValue("answer")
+	explanation := c.FormValue("explanation")
 	order := 0
 	estimateValue := 0
 	estimateUnit := c.FormValue("estimate_unit")
@@ -869,7 +872,7 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 		return utils.Error(c, fiber.StatusForbidden, err.Error(), "PREMIUM_REQUIRED", nil)
 	}
 
-	item, err := h.bookSvc.AddItem(bookID, &moduleID, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL)
+	item, err := h.bookSvc.AddItem(bookID, &moduleID, userID, title, content, answer, explanation, order, estimateValue, estimateUnit, imageURL)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "ADD_ITEM_FAILED", nil)
 	}
@@ -888,6 +891,7 @@ func (h *BookHandler) AddItemToModule(c *fiber.Ctx) error {
 // @Param title formData string false "Item title"
 // @Param content formData string false "Item content"
 // @Param answer formData string false "Item answer"
+// @Param explanation formData string false "Item explanation (optional)"
 // @Param order formData int false "Item order"
 // @Param estimate_value formData int false "Estimate value"
 // @Param estimate_unit formData string false "Estimate unit (seconds or minutes)"
@@ -903,6 +907,7 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 	title := c.FormValue("title")
 	content := c.FormValue("content")
 	answer := c.FormValue("answer")
+	explanation := c.FormValue("explanation")
 	order := 0
 	estimateValue := 0
 	estimateUnit := c.FormValue("estimate_unit")
@@ -929,7 +934,7 @@ func (h *BookHandler) UpdateItem(c *fiber.Ctx) error {
 		}
 	}
 
-	item, err := h.bookSvc.UpdateItem(itemID, userID, title, content, answer, order, estimateValue, estimateUnit, imageURL, removeImage)
+	item, err := h.bookSvc.UpdateItem(itemID, userID, title, content, answer, explanation, order, estimateValue, estimateUnit, imageURL, removeImage)
 	if err != nil {
 		return utils.Error(c, fiber.StatusBadRequest, err.Error(), "UPDATE_ITEM_FAILED", nil)
 	}

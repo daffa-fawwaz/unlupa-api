@@ -47,8 +47,8 @@ type BookService interface {
 	DeleteModule(moduleID string, ownerID uuid.UUID) error
 
 	// Item CRUD
-	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error)
-	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string, removeImage bool) (*entities.BookItem, error)
+	AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer, explanation string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error)
+	UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer, explanation string, order int, estimateVal int, estimateUnit string, imageURL string, removeImage bool) (*entities.BookItem, error)
 	DeleteItem(itemID string, ownerID uuid.UUID) error
 
 	// Memorization
@@ -665,8 +665,10 @@ func (s *bookService) CopyPublishedBookToDraft(
 			Title:                  it.Title,
 			Content:                it.Content,
 			Answer:                 it.Answer,
+			Explanation:            it.Explanation,
 			Order:                  it.Order,
 			EstimatedReviewSeconds: it.EstimatedReviewSeconds,
+			ImageURL:               it.ImageURL,
 		}
 		if err := s.bookItemRepo.Create(newItem); err != nil {
 			return nil, err
@@ -687,8 +689,10 @@ func (s *bookService) CopyPublishedBookToDraft(
 				Title:                  it.Title,
 				Content:                it.Content,
 				Answer:                 it.Answer,
+				Explanation:            it.Explanation,
 				Order:                  it.Order,
 				EstimatedReviewSeconds: it.EstimatedReviewSeconds,
+				ImageURL:               it.ImageURL,
 			}
 			if err := s.bookItemRepo.Create(newItem); err != nil {
 				return nil, err
@@ -1156,6 +1160,9 @@ func ResolveBookItemContent(
 	if override.Answer != "" {
 		resolved.Answer = override.Answer
 	}
+	if override.Explanation != "" {
+		resolved.Explanation = override.Explanation
+	}
 	if override.ImageURL != "" {
 		resolved.ImageURL = override.ImageURL
 	}
@@ -1238,7 +1245,7 @@ func normalizeEstSeconds(estimateVal int, estimateUnit string) int {
 	}
 }
 
-func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error) {
+func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.UUID, title, content, answer, explanation string, order int, estimateVal int, estimateUnit string, imageURL string) (*entities.BookItem, error) {
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
@@ -1285,6 +1292,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 			Title:                  title,
 			Content:                content,
 			Answer:                 answer,
+			Explanation:            explanation,
 			Order:                  order,
 			EstimatedReviewSeconds: estSeconds,
 			ImageURL:               imageURL,
@@ -1316,6 +1324,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 		Title:                  title,
 		Content:                content,
 		Answer:                 answer,
+		Explanation:            explanation,
 		Order:                  order,
 		EstimatedReviewSeconds: estSeconds,
 		ImageURL:               imageURL,
@@ -1330,7 +1339,7 @@ func (s *bookService) AddItem(bookID string, moduleID *uuid.UUID, ownerID uuid.U
 	return item, nil
 }
 
-func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer string, order int, estimateVal int, estimateUnit string, imageURL string, removeImage bool) (*entities.BookItem, error) {
+func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, content, answer, explanation string, order int, estimateVal int, estimateUnit string, imageURL string, removeImage bool) (*entities.BookItem, error) {
 	item, err := s.bookItemRepo.FindByID(itemID)
 	if err != nil {
 		return nil, errors.New("item not found")
@@ -1366,6 +1375,9 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 			}
 			if answer != "" {
 				item.Answer = answer
+			}
+			if explanation != "" {
+				item.Explanation = explanation
 			}
 			if order > 0 {
 				item.Order = order
@@ -1407,6 +1419,7 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 				Title:                  item.Title,
 				Content:                item.Content,
 				Answer:                 item.Answer,
+				Explanation:            item.Explanation,
 				ImageURL:               item.ImageURL,
 				EstimatedReviewSeconds: item.EstimatedReviewSeconds,
 			}
@@ -1419,6 +1432,9 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 		}
 		if answer != "" {
 			base.Answer = answer
+		}
+		if explanation != "" {
+			base.Explanation = explanation
 		}
 		if imageURL != "" {
 			base.ImageURL = imageURL
@@ -1437,6 +1453,7 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 		result.Title = base.Title
 		result.Content = base.Content
 		result.Answer = base.Answer
+		result.Explanation = base.Explanation
 		result.ImageURL = base.ImageURL
 		result.EstimatedReviewSeconds = base.EstimatedReviewSeconds
 		return &result, nil
@@ -1451,6 +1468,9 @@ func (s *bookService) UpdateItem(itemID string, ownerID uuid.UUID, title, conten
 	}
 	if answer != "" {
 		item.Answer = answer
+	}
+	if explanation != "" {
+		item.Explanation = explanation
 	}
 	if order > 0 {
 		item.Order = order
