@@ -17,10 +17,11 @@ type BookItem struct {
 	// published book — item tersebut HANYA terlihat untuk importer tersebut.
 	ImporterID *uuid.UUID `gorm:"type:uuid;index" json:"importer_id,omitempty"`
 
-	Title   string `gorm:"size:200;not null" json:"title"`
-	Content string `gorm:"type:text" json:"content"` // materi konten
-	Answer  string `gorm:"type:text" json:"answer"`  // jawaban
-	Order   int    `gorm:"not null;default:0" json:"order"`
+	Title       string `gorm:"size:200;not null" json:"title"`
+	Content     string `gorm:"type:text" json:"content"`     // materi konten
+	Answer      string `gorm:"type:text" json:"answer"`      // jawaban
+	Explanation string `gorm:"type:text" json:"explanation"` // penjelasan (opsional)
+	Order       int    `gorm:"not null;default:0" json:"order"`
 
 	// Gambar item (hanya untuk user premium)
 	ImageURL string `gorm:"size:500" json:"image_url,omitempty"`

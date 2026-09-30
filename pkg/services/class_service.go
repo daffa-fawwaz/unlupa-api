@@ -13,6 +13,7 @@ import (
 	"hifzhun-api/pkg/config"
 	"hifzhun-api/pkg/entities"
 	"hifzhun-api/pkg/repositories"
+	"hifzhun-api/pkg/utils"
 
 	"github.com/google/uuid"
 )
@@ -452,6 +453,9 @@ func (s *classService) UpdateClass(classID string, teacherID uuid.UUID, name, de
 		class.Description = description
 	}
 	if coverImage != "" {
+		if class.CoverImage != "" && class.CoverImage != coverImage {
+			_ = utils.DeleteFromSupabase(class.CoverImage)
+		}
 		class.CoverImage = coverImage
 	}
 	if isActive != nil {
@@ -473,6 +477,11 @@ func (s *classService) DeleteClass(classID string, teacherID uuid.UUID) error {
 
 	if class.GuruID != teacherID {
 		return errors.New("you don't have permission to delete this class")
+	}
+
+	// Delete cover image from Supabase Storage if present
+	if class.CoverImage != "" {
+		_ = utils.DeleteFromSupabase(class.CoverImage)
 	}
 
 	// Delete all members and books

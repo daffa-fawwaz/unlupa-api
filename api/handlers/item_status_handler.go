@@ -171,6 +171,7 @@ type ItemDetailResponse struct {
 	JuzIndex               *int      `json:"juz_index,omitempty"`
 	Question               *string   `json:"question,omitempty"`
 	Answer                 *string   `json:"answer,omitempty"`
+	Explanation            *string   `json:"explanation,omitempty"`
 	Image                  *string   `json:"image,omitempty"`
 }
 
@@ -246,6 +247,10 @@ func (h *ItemStatusHandler) GetDetail(c *fiber.Ctx) error {
 				a := resolved.Answer
 				resp.Question = &q
 				resp.Answer = &a
+				if resolved.Explanation != "" {
+					exp := resolved.Explanation
+					resp.Explanation = &exp
+				}
 				if resolved.ImageURL != "" {
 					img := resolved.ImageURL
 					resp.Image = &img

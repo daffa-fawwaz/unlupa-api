@@ -24,10 +24,11 @@ type BookItemOverride struct {
 	UserID     uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
 	BookItemID uuid.UUID `gorm:"type:uuid;not null;index" json:"book_item_id"`
 
-	Title    string `gorm:"size:200" json:"title"`
-	Content  string `gorm:"type:text" json:"content"`
-	Answer   string `gorm:"type:text" json:"answer"`
-	ImageURL string `gorm:"size:500" json:"image_url,omitempty"`
+	Title       string `gorm:"size:200" json:"title"`
+	Content     string `gorm:"type:text" json:"content"`
+	Answer      string `gorm:"type:text" json:"answer"`
+	Explanation string `gorm:"type:text" json:"explanation"`
+	ImageURL    string `gorm:"size:500" json:"image_url,omitempty"`
 
 	EstimatedReviewSeconds int `gorm:"default:0" json:"estimated_review_seconds"`
 
