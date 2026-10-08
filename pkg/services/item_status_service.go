@@ -309,11 +309,80 @@ func (s *ItemStatusService) GetIntervalReviewStats(itemID uuid.UUID, userID uuid
 }
 
 // ActivateToFSRS moves item from interval → fsrs_active (user decision)
-// Also supports book items from 'start' status → fsrs_active
+// Also supports book items from 'start', 'menghafal', or 'inactive' status → fsrs_active
+// If itemID is a BookItem ID that hasn't been started yet, it automatically creates and activates the progress item.
 func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
 	item, err := s.itemRepo.GetByID(itemID)
-	if err != nil {
-		return nil, errors.New("item not found")
+	// A class book can already have an Item row owned by its teacher. Never
+	// mutate that shared row for a student; resolve the student's own progress
+	// row using the same book content_ref used by the BookItem activation path.
+	if err == nil && item != nil && item.OwnerID != userID {
+		bookID, isBookItem := bookIDFromItemContentRef(item.ContentRef)
+		if item.SourceType != "book" || !isBookItem || s.classBookRepo == nil {
+			return nil, errors.New("unauthorized")
+		}
+		// This check joins class_books to class_members, so a published/imported
+		// book or a membership in an unrelated class does not grant access.
+		isSharedWithStudent, errAccess := s.classBookRepo.IsBookAccessibleByMember(bookID, userID.String())
+		if errAccess != nil || !isSharedWithStudent {
+			return nil, errors.New("you don't have access to this book item")
+		}
+		var studentItem entities.Item
+		if errFind := config.DB.Where("owner_id = ? AND content_ref = ?", userID, item.ContentRef).First(&studentItem).Error; errFind == nil {
+			item = &studentItem
+		} else {
+			// The shared Item is only a reference to the book content. Resolve
+			// its BookItem and create student progress through the established
+			// book activation path below.
+			parts := strings.Split(item.ContentRef, ":")
+			var bookItem entities.BookItem
+			if len(parts) != 4 || parts[0] != "book" || parts[2] != "item" || config.DB.Where("id = ?", parts[3]).First(&bookItem).Error != nil {
+				return nil, errors.New("item not found")
+			}
+			item = nil
+			itemID = bookItem.ID
+		}
+	}
+	if err != nil || item == nil {
+		// Fallback 1: check if user already has an item with content_ref ending in :item:<itemID>
+		var existingItems []entities.Item
+		if errFind := config.DB.Where("owner_id = ? AND content_ref LIKE ?", userID, "%:item:"+itemID.String()).Find(&existingItems).Error; errFind == nil && len(existingItems) > 0 {
+			item = &existingItems[0]
+		} else {
+			// Fallback 2: check if itemID is a BookItem
+			var bookItem entities.BookItem
+			if errBookItem := config.DB.Where("id = ?", itemID).First(&bookItem).Error; errBookItem == nil {
+				contentRef := "book:" + bookItem.BookID.String() + ":item:" + bookItem.ID.String()
+				dummyItem := &entities.Item{
+					SourceType: "book",
+					ContentRef: contentRef,
+				}
+				if !s.canAccessBookItem(dummyItem, userID) {
+					return nil, errors.New("you don't have access to this book item")
+				}
+
+				now := time.Now().In(config.AppLocation)
+				nextDay := now.AddDate(0, 0, 1)
+				nextReview := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, config.AppLocation)
+				newItem := &entities.Item{
+					OwnerID:                userID,
+					SourceType:             "book",
+					ContentRef:             contentRef,
+					Status:                 entities.ItemStatusFSRSActive,
+					IntervalEndAt:          &now,
+					FSRSStartAt:            &now,
+					NextReviewAt:           &nextReview,
+					Stability:              0.4,
+					Difficulty:             5.0,
+					EstimatedReviewSeconds: bookItem.EstimatedReviewSeconds,
+				}
+				if errCreate := s.itemRepo.Create(newItem); errCreate != nil {
+					return nil, errCreate
+				}
+				return newItem, nil
+			}
+			return nil, errors.New("item not found")
+		}
 	}
 
 	if item.OwnerID != userID {
@@ -323,13 +392,13 @@ func (s *ItemStatusService) ActivateToFSRS(itemID uuid.UUID, userID uuid.UUID) (
 		return nil, errors.New("you don't have access to this book item")
 	}
 
-	// For book items: allow activation from 'start' or 'menghafal' status
-	if item.SourceType == "book" && (item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal) {
+	// For book items: allow activation from 'start', 'menghafal', or 'inactive' status
+	if item.SourceType == "book" && (item.Status == entities.ItemStatusStart || item.Status == entities.ItemStatusMenghafal || item.Status == entities.ItemStatusInactive) {
 		// Book items can activate to FSRS directly
-	} else if item.SourceType == "quran" && (item.Status == entities.ItemStatusMenghafal || item.Status == entities.ItemStatusInterval) {
-		// Quran items can activate to FSRS directly from 'menghafal' or legacy 'interval' status
+	} else if item.SourceType == "quran" && (item.Status == entities.ItemStatusMenghafal || item.Status == entities.ItemStatusInterval || item.Status == entities.ItemStatusInactive) {
+		// Quran items can activate to FSRS directly from 'menghafal', legacy 'interval', or 'inactive' status
 	} else if item.Status != entities.ItemStatusInterval {
-		return nil, errors.New("item must be in 'interval' status to activate FSRS")
+		return nil, errors.New("item must be in 'interval', 'start', or 'inactive' status to activate FSRS")
 	}
 
 	now := time.Now().In(config.AppLocation)
@@ -453,8 +522,13 @@ func (s *ItemStatusService) GetItemDetail(itemID uuid.UUID, userID uuid.UUID) (*
 // Only for non-quran items (book items)
 func (s *ItemStatusService) DeactivateItem(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
 	item, err := s.itemRepo.GetByID(itemID)
-	if err != nil {
-		return nil, errors.New("item not found")
+	if err != nil || item == nil {
+		var existingItems []entities.Item
+		if errFind := config.DB.Where("owner_id = ? AND content_ref LIKE ?", userID, "%:item:"+itemID.String()).Find(&existingItems).Error; errFind == nil && len(existingItems) > 0 {
+			item = &existingItems[0]
+		} else {
+			return nil, errors.New("item not found")
+		}
 	}
 
 	// Validate ownership
@@ -465,11 +539,6 @@ func (s *ItemStatusService) DeactivateItem(itemID uuid.UUID, userID uuid.UUID) (
 	// Validate source type - only for book items
 	if item.SourceType == "quran" {
 		return nil, errors.New("quran items cannot be deactivated")
-	}
-
-	// Validate current status - must be fsrs_active
-	if item.Status != entities.ItemStatusFSRSActive {
-		return nil, errors.New("item must be in 'fsrs_active' status to deactivate")
 	}
 
 	// Transition to inactive
@@ -486,8 +555,13 @@ func (s *ItemStatusService) DeactivateItem(itemID uuid.UUID, userID uuid.UUID) (
 // Only for non-quran items (book items)
 func (s *ItemStatusService) ReactivateItem(itemID uuid.UUID, userID uuid.UUID) (*entities.Item, error) {
 	item, err := s.itemRepo.GetByID(itemID)
-	if err != nil {
-		return nil, errors.New("item not found")
+	if err != nil || item == nil {
+		var existingItems []entities.Item
+		if errFind := config.DB.Where("owner_id = ? AND content_ref LIKE ?", userID, "%:item:"+itemID.String()).Find(&existingItems).Error; errFind == nil && len(existingItems) > 0 {
+			item = &existingItems[0]
+		} else {
+			return nil, errors.New("item not found")
+		}
 	}
 
 	// Validate ownership
@@ -500,13 +574,19 @@ func (s *ItemStatusService) ReactivateItem(itemID uuid.UUID, userID uuid.UUID) (
 		return nil, errors.New("quran items cannot be reactivated")
 	}
 
-	// Validate current status - must be inactive
-	if item.Status != entities.ItemStatusInactive {
-		return nil, errors.New("item must be in 'inactive' status to reactivate")
-	}
+	now := time.Now().In(config.AppLocation)
+	nextDay := now.AddDate(0, 0, 1)
+	nextReview := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, config.AppLocation)
 
 	// Transition back to fsrs_active
 	item.Status = entities.ItemStatusFSRSActive
+	item.NextReviewAt = &nextReview
+	if math.IsNaN(item.Stability) || math.IsInf(item.Stability, 0) || item.Stability <= 0 {
+		item.Stability = 0.4
+	}
+	if math.IsNaN(item.Difficulty) || math.IsInf(item.Difficulty, 0) || item.Difficulty <= 0 {
+		item.Difficulty = 5.0
+	}
 
 	if err := s.itemRepo.Update(item); err != nil {
 		return nil, err

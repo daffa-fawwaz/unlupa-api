@@ -505,18 +505,21 @@ func (s *classService) AddBookToClass(classID string, teacherID uuid.UUID, bookI
 		return nil, errors.New("you don't have permission to add book to this class")
 	}
 
-	if class.Type != entities.ClassTypeBook {
+	if class.Type == entities.ClassTypeQuran {
 		return nil, errors.New("can only add books to book-type classes")
 	}
 
-	// Verify book exists and belongs to teacher
+	// Verify book exists
 	book, err := s.bookRepo.FindByID(bookID)
 	if err != nil {
 		return nil, errors.New("book not found")
 	}
 
-	if book.OwnerID != teacherID {
-		return nil, errors.New("you can only add your own books to class")
+	if book.OwnerID != teacherID && book.Status != entities.BookStatusPublished {
+		isImported, _ := s.classBookRepo.IsBookImportedByUser(bookID, teacherID.String())
+		if !isImported {
+			return nil, errors.New("you can only add your own books or published books to class")
+		}
 	}
 
 	// Check if book already added
@@ -958,7 +961,7 @@ func (s *classService) GetClassBooks(classID string, userID uuid.UUID) ([]entiti
 		}
 	}
 
-	if class.Type != entities.ClassTypeBook {
+	if class.Type == entities.ClassTypeQuran {
 		return nil, errors.New("this class does not contain books")
 	}
 

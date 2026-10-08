@@ -37,6 +37,7 @@ type ReviewItemResponse struct {
 	Stability    float64    `json:"stability" example:"5.5"`
 	Difficulty   float64    `json:"difficulty" example:"3.2"`
 	IntervalDays int        `json:"next_interval_days" example:"7"`
+	LastReviewAt *time.Time `json:"last_review_at"`
 	NextReviewAt *time.Time `json:"next_review_at"`
 	Graduated    bool       `json:"graduated" example:"false"`
 	ReviewCount  int        `json:"review_count" example:"5"`
@@ -96,6 +97,7 @@ func (h *ItemReviewHandler) ReviewItem(c *fiber.Ctx) error {
 		Stability:    result.Item.Stability,
 		Difficulty:   result.Item.Difficulty,
 		IntervalDays: result.IntervalDays,
+		LastReviewAt: result.Item.LastReviewAt,
 		NextReviewAt: result.NextReviewAt,
 		Graduated:    result.Graduated,
 		ReviewCount:  result.ReviewCount,
