@@ -9,6 +9,7 @@ import (
 
 func RegisterAIRoutes(router fiber.Router, handler *handlers.AIHandler) {
 	ai := router.Group("/ai", middlewares.JWTAuth())
+	ai.Get("/book-usage", handler.GetBookUsage)
 	ai.Post("/generate-book", handler.GenerateBook)
 	ai.Post("/generate-cards", handler.GenerateCards)
 }

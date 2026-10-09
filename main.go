@@ -195,8 +195,9 @@ func main() {
 	quranPageHandler := handlers.NewQuranPageHandler(quranPageSvc, appCache)
 
 	// ================= AI BUILDER (GEMINI) =================
+	aiLogRepo := repositories.NewAIBookGenerationRepository(config.DB)
 	aiSvc := services.NewAIService()
-	aiHandler := handlers.NewAIHandler(aiSvc)
+	aiHandler := handlers.NewAIHandler(aiSvc, aiLogRepo)
 
 	// ================= ROUTES =================
 	routes.SetupRoutes(
