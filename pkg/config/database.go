@@ -85,6 +85,7 @@ func ConnectDatabase() {
 		&entities.QuranPageProgress{},
 		&entities.QuranJuzCatalog{},
 		&entities.QuranPageCatalog{},
+		&entities.AIBookGenerationLog{},
 	)
 	if err != nil {
 		log.Fatal("❌ Failed to migrate:", err)
